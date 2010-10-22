@@ -368,7 +368,12 @@ F	RET_CONST(new Val(false, TYPE_BOOL))
 	return TOK_PATTERN_TEXT;
 	}
 
-<RE>[/\\\n]	return yytext[0];
+<RE>[\\\n]     	return yytext[0];	/* the original rule */
+
+<RE>"/"[i]*	{ 
+	yylval.str = yytext+1; /* +1 to strip the slash */
+	return TOK_PATTERN_MODIFIERS;
+	}
 
 <*>.	error("unrecognized character -", yytext);
 

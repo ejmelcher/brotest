@@ -43,6 +43,8 @@ static int my_isxdigit(int c)	{ return isxdigit(c); }
 %option caseless nodefault nostdinit noyywrap
 
 %x SC_NUM SC_QUOTE SC_FIRST_CCL SC_CCL
+%x GROUP_WITH_PARAMS
+%x GROUP_MINUS_PARAMS
 
 NAME		([[:alpha:]_][[:alnum:]_-]*)
 
@@ -156,12 +158,7 @@ CCL_EXPR	("[:"[[:alpha:]]+":]")
 	"[:punct:]"	RET_CCE(my_ispunct)
 	"[:space:]"	RET_CCE(my_isspace)
 	"[:xdigit:]"	RET_CCE(my_isxdigit)
-	"[:upper:]"	{
-			BEGIN(SC_CCL);
-			yylval.cce_val =
-				case_insensitive ? my_isupper : my_islower;
-			return TOK_CCE;
-			}
+	"[:upper:]"	RET_CCE(my_isupper)
 
 	{CCL_EXPR}	{
 			synerr("bad character class expression");

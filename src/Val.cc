@@ -1412,11 +1412,9 @@ int PatternVal::AddTo(Val* v, int /* is_first_init */) const
 		}
 
 	PatternVal* pv = v->AsPatternVal();
-
-	RE_Matcher* re = new RE_Matcher(AsPattern()->PatternText());
-	re->AddPat(pv->AsPattern()->PatternText());
-	re->Compile();
-
+	RE_Matcher* re = RE_Matcher_disjunction(AsPattern(), pv->AsPattern());
+	
+	printf("Pattern: %s\n", re->PatternText());
 	pv->SetMatcher(re);
 
 	return 1;

@@ -12,7 +12,7 @@
 int csize = 256;
 int syntax_error = 0;
 
-int clower(int sym);
+int reverse_case(int sym);
 void yyerror(const char msg[]);
 %}
 
@@ -129,9 +129,13 @@ singleton	:  singleton '*'
 
 		|  TOK_CHAR
 			{
-			if ( case_insensitive && $1 >= 'A' && $1 <= 'Z' )
-				$1 = clower($1);
-			$$ = new NFA_Machine(new NFA_State($1, rem->EC()));
+			if ( rem->CaseInsensitive() )
+				{
+				$$ = make_alternate(new NFA_Machine(new NFA_State($1, rem->EC())),
+				                    new NFA_Machine(new NFA_State(reverse_case($1), rem->EC())));
+				}
+			else
+				$$ = new NFA_Machine(new NFA_State($1, rem->EC()));
 			}
 
 		|  '^'
@@ -159,14 +163,6 @@ full_ccl	:  '[' ccl ']'
 
 ccl		:  ccl TOK_CHAR '-' TOK_CHAR
 			{
-			if ( case_insensitive )
-				{
-				if ( $2 >= 'A' && $2 <= 'Z' )
-					$2 = clower($2);
-				if ( $4 >= 'A' && $4 <= 'Z' )
-					$4 = clower($4);
-				}
-
 			if ( $2 > $4 )
 				synerr("negative range in character class");
 
@@ -174,15 +170,27 @@ ccl		:  ccl TOK_CHAR '-' TOK_CHAR
 				{
 				for ( int i = $2; i <= $4; ++i )
 					$1->Add(i);
+					
+				if ( rem->CaseInsensitive() )
+					{
+					$2 = reverse_case($2);
+					$4 = reverse_case($4);
+					for ( int i = $2; i <= $4; ++i )
+						$1->Add(i);
+					}
 				}
+			$$=$1;
 			}
 
 		|  ccl TOK_CHAR
 			{
-			if ( case_insensitive && $2 >= 'A' && $2 <= 'Z' )
-				$2 = clower($2);
-
 			$1->Add($2);
+			if ( rem->CaseInsensitive() )
+				{
+				$2 = reverse_case($2);
+				$1->Add($2);
+				}
+			$$=$1;
 			}
 
 		|  ccl ccl_expr
@@ -201,10 +209,13 @@ ccl_expr:	   TOK_CCE
 
 string		:  string TOK_CHAR
 			{
-			if ( case_insensitive && $2 >= 'A' && $2 <= 'Z' )
-				$2 = clower($2);
+			if ( rem->CaseInsensitive() )
+				$$ = make_alternate(new NFA_Machine(new NFA_State($2, rem->EC())),
+			                        new NFA_Machine(new NFA_State(reverse_case($2), rem->EC())));
+			else
+				$$ = new NFA_Machine(new NFA_State($2, rem->EC()));
 
-			$1->AppendState(new NFA_State($2, rem->EC()));
+			$1->AppendMachine($$);
 			}
 
 		|
@@ -212,10 +223,10 @@ string		:  string TOK_CHAR
 		;
 %%
 
-int clower(int sym)
-	{
-	return (isascii(sym) && isupper(sym)) ?  tolower(sym) : sym;
-	}
+int reverse_case(int sym)
+{
+	return isupper (sym) ? tolower (sym) : (islower (sym) ? toupper (sym) : sym);
+}
 
 void synerr(const char str[])
 	{

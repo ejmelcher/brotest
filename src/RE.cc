@@ -16,7 +16,6 @@ CCL* curr_ccl = 0;
 
 Specific_RE_Matcher* rem;
 NFA_Machine* nfa = 0;
-int case_insensitive = 0;
 
 extern int RE_parse(void);
 extern void RE_set_input(const char* str);
@@ -29,6 +28,7 @@ Specific_RE_Matcher::Specific_RE_Matcher(match_type arg_mt, int arg_multiline)
 	{
 	mt = arg_mt;
 	multiline = arg_multiline;
+	case_insensitive = 0;
 	any_ccl = 0;
 	pattern_text = 0;
 	dfa = 0;
@@ -448,6 +448,10 @@ RE_Matcher::~RE_Matcher()
 
 void RE_Matcher::AddPat(const char* new_pat)
 	{
+	if ( CaseInsensitive() )
+		{
+		}
+		
 	re_anywhere->AddPat(new_pat);
 	re_exact->AddPat(new_pat);
 	}

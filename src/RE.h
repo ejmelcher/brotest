@@ -31,7 +31,7 @@ extern Specific_RE_Matcher* rem;
 extern const char* RE_parse_input;
 
 extern int re_lex(void);
-extern int clower(int);
+extern int reverse_ca(int);
 extern void synerr(const char str[]);
 
 typedef int_list AcceptingSet;
@@ -99,6 +99,9 @@ public:
 	void Dump(FILE* f);
 
 	unsigned int MemoryAllocation() const;
+	
+	int CaseInsensitive() { return case_insensitive; }
+	void MakeCaseInsensitive() { case_insensitive=1; }
 
 protected:
 	void AddAnywherePat(const char* pat);
@@ -114,6 +117,7 @@ protected:
 
 	match_type mt;
 	int multiline;
+	int case_insensitive;
 	char* pattern_text;
 
 	PDict(char) defs;
@@ -220,6 +224,9 @@ public:
 			+ (re_anywhere ? re_anywhere->MemoryAllocation() : 0)
 			+ (re_exact ? re_exact->MemoryAllocation() : 0);
 		}
+		
+	int CaseInsensitive() { return re_anywhere->CaseInsensitive() || this->re_exact->CaseInsensitive(); }
+	void MakeCaseInsensitive() { re_anywhere->MakeCaseInsensitive(); re_exact->MakeCaseInsensitive(); }
 
 protected:
 	DECLARE_SERIAL(RE_Matcher);

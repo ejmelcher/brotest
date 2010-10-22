@@ -10,7 +10,7 @@
 %token TOK_DOUBLE TOK_ELSE TOK_ENUM TOK_EVENT TOK_EXPORT TOK_FILE TOK_FOR
 %token TOK_FUNCTION TOK_GLOBAL TOK_GLOBAL_ATTR TOK_ID TOK_IF TOK_INT
 %token TOK_INTERVAL TOK_LIST TOK_LOCAL TOK_MODULE TOK_MATCH TOK_NET
-%token TOK_NEXT TOK_OF TOK_PATTERN TOK_PATTERN_TEXT
+%token TOK_NEXT TOK_OF TOK_PATTERN TOK_PATTERN_TEXT TOK_PATTERN_MODIFIERS
 %token TOK_PORT TOK_PRINT TOK_RECORD TOK_REDEF
 %token TOK_REMOVE_FROM TOK_RETURN TOK_SCHEDULE TOK_SET
 %token TOK_STRING TOK_SUBNET TOK_SWITCH TOK_TABLE TOK_THIS
@@ -21,7 +21,8 @@
 %token TOK_ATTR_ROTATE_SIZE TOK_ATTR_DEL_FUNC TOK_ATTR_EXPIRE_FUNC
 %token TOK_ATTR_EXPIRE_CREATE TOK_ATTR_EXPIRE_READ TOK_ATTR_EXPIRE_WRITE
 %token TOK_ATTR_PERSISTENT TOK_ATTR_SYNCHRONIZED
-%token TOK_ATTR_DISABLE_PRINT_HOOK TOK_ATTR_RAW_OUTPUT TOK_ATTR_MERGEABLE
+%token TOK_ATTR_DISABLE_PRINT_HOOK TOK_ATTR_RAW_OUTPUT 
+%token TOK_ATTR_CASE_INSENSITIVE TOK_ATTR_MERGEABLE
 %token TOK_ATTR_PRIORITY TOK_ATTR_GROUP
 
 %token TOK_DEBUG
@@ -39,13 +40,13 @@
 %right '!'
 %left '$' '[' ']' '(' ')' TOK_HAS_FIELD TOK_HAS_ATTR
 
-%type <str> TOK_ID TOK_PATTERN_TEXT single_pattern
+%type <str> TOK_ID TOK_PATTERN_TEXT TOK_PATTERN_MODIFIERS
 %type <id> local_id global_id event_id global_or_event_id resolve_id begin_func
 %type <id_l> local_id_list
 %type <ic> init_class
 %type <expr> opt_init
 %type <val> TOK_CONSTANT
-%type <re> pattern
+%type <re> pattern 
 %type <expr> expr init anonymous_function
 %type <event_expr> event
 %type <stmt> stmt stmt_list func_body for_head
@@ -59,7 +60,7 @@
 %type <c_case> case
 %type <case_l> case_list
 %type <attr> attr
-%type <attr_l> attr_list opt_attr
+%type <attr_l> attr_list opt_attr 
 
 %{
 #include <stdlib.h>
@@ -485,7 +486,7 @@ expr:
 			set_location(@1);
 			$$ = new ConstExpr($1);
 			}
-
+			
 	|	pattern
 			{
 			set_location(@1);
@@ -532,22 +533,25 @@ opt_comma:
 	;
 
 pattern:
-		pattern '|' single_pattern
+		pattern '|' pattern
 			{
-			$1->AddPat($3);
+			printf ("doing a disjunction\n");
+			$$ = RE_Matcher_disjunction($1, $3);
+			}
+
+	|	'/' { begin_RE(); } TOK_PATTERN_TEXT TOK_PATTERN_MODIFIERS { end_RE(); }
+			{
+			printf("pattern: %s :: mod: %s\n", $3, $4);
+
+			$$ = new RE_Matcher();
+			if ( strcasestr($4, "i") )
+				{
+				$$->MakeCaseInsensitive();
+				}
+			
+			$$->AddPat($3);
 			delete [] $3;
 			}
-
-	|	single_pattern
-			{
-			$$ = new RE_Matcher($1);
-			delete [] $1;
-			}
-	;
-
-single_pattern:
-		'/' { begin_RE(); } TOK_PATTERN_TEXT { end_RE(); } '/'
-			{ $$ = $3; }
 	;
 
 enum_id_list:
@@ -1002,6 +1006,8 @@ attr:
 			{ $$ = new Attr(ATTR_DISABLE_PRINT_HOOK); }
 	|	TOK_ATTR_RAW_OUTPUT
 			{ $$ = new Attr(ATTR_RAW_OUTPUT); }
+	|	TOK_ATTR_CASE_INSENSITIVE
+			{ $$ = new Attr(ATTR_CASE_INSENSITIVE); }
 	|	TOK_ATTR_MERGEABLE
 			{ $$ = new Attr(ATTR_MERGEABLE); }
 	|	TOK_ATTR_PRIORITY '=' expr

@@ -17,7 +17,7 @@ const char* attr_name(attr_tag t)
 		"&read_expire", "&write_expire", "&create_expire",
 		"&persistent", "&synchronized", "&postprocessor",
 		"&encrypt", "&match", "&disable_print_hook",
-		"&raw_output", "&mergeable", "&priority",
+		"&raw_output", "&case_insensitive", "&mergeable", "&priority",
 		"&group", "(&tracked)",
 	};
 
@@ -302,6 +302,11 @@ void Attributes::CheckAttr(Attr* a)
 	case ATTR_RAW_OUTPUT:
 		if ( type->Tag() != TYPE_FILE )
 			Error("&raw_output only applicable to files");
+		break;
+		
+	case ATTR_CASE_INSENSITIVE:
+		if ( type->Tag() != TYPE_PATTERN )
+			Error("&case_insensitive only applicable to patterns");
 		break;
 
 	case ATTR_MERGEABLE:
