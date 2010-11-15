@@ -197,6 +197,8 @@ event netbios_session_raw_message%(c: connection, is_orig: bool, msg: string%);
 event netbios_session_ret_arg_resp%(c: connection, msg: string%);
 event netbios_session_keepalive%(c: connection, msg: string%);
 
+event sebek_message%(c: connection, hdr: sebek_hdr, data: string%);
+
 event smb_message%(c: connection, hdr: smb_hdr, is_orig: bool, cmd: string, body_length: count, body: string%);
 event smb_com_tree_connect_andx%(c: connection, hdr: smb_hdr, path: string, service: string%);
 event smb_com_tree_disconnect%(c: connection, hdr: smb_hdr%);

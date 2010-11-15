@@ -809,6 +809,21 @@ type smb_tree_connect : record {
 
 type smb_negotiate : table[count] of string;
 
+type sebek_hdr: record {
+	magic       : count;
+	ver         : count;
+	msg_type    : count;
+	msg_counter : count;
+	time_sec    : count;
+	time_usec   : count;
+	parent_pid  : count;
+	pid         : count;
+	uid         : count;
+	fd          : count;
+	inode       : count;
+	com         : string;
+};
+
 # A list of router addresses offered by the server.
 type dhcp_router_list: table[count] of addr;
 

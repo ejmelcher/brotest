@@ -33,6 +33,7 @@
 #include "NFS.h"
 #include "Portmap.h"
 #include "POP3.h"
+#include "Sebek-binpac.h"
 #include "SSH.h"
 #include "SSLProxy.h"
 #include "SSL-binpac.h"
@@ -135,6 +136,9 @@ const Analyzer::Config Analyzer::analyzer_configs[] = {
 	{ AnalyzerTag::RPC_UDP_BINPAC, "RPC_UDP_BINPAC",
 		RPC_UDP_Analyzer_binpac::InstantiateAnalyzer,
 		RPC_UDP_Analyzer_binpac::Available, 0, false },
+	{ AnalyzerTag::SEBEK_BINPAC, "SEBEK_BINPAC",
+		Sebek_Analyzer_binpac::InstantiateAnalyzer,
+		Sebek_Analyzer_binpac::Available, 0, false },
 	{ AnalyzerTag::SSL_BINPAC, "SSL_BINPAC",
 		SSL_Analyzer_binpac::InstantiateAnalyzer,
 		SSL_Analyzer_binpac::Available, 0, false },

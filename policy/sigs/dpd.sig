@@ -149,3 +149,10 @@ signature dpd_ssl_client {
   payload /^(\x16\x03[\x00\x01\x02]..\x01...\x03[\x00\x01\x02]|...?\x01[\x00\x01\x02][\x02\x03]).*/
   tcp-state originator
 }
+
+signature dpd_sebek_message {
+  ip-proto == udp
+  # We only support version 3 messages so that's all we watch for with DPD.
+  payload /^\x00\x00\x00\x2a\x00\x03/
+  enable "sebek"
+}

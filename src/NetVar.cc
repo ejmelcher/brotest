@@ -49,6 +49,8 @@ int tcp_max_initial_window;
 int tcp_max_above_hole_without_any_acks;
 int tcp_excessive_data_without_further_acks;
 
+RecordType* sebek_hdr;
+
 int ssl_compare_cipherspecs;
 int ssl_analyze_certificates;
 int ssl_store_certificates;
@@ -351,6 +353,8 @@ void init_net_var()
 		opt_internal_int("tcp_max_above_hole_without_any_acks");
 	tcp_excessive_data_without_further_acks =
 		opt_internal_int("tcp_excessive_data_without_further_acks");
+		
+	sebek_hdr = internal_type("sebek_hdr")->AsRecordType();
 
 	ssl_compare_cipherspecs  = opt_internal_int("ssl_compare_cipherspecs");
 	ssl_analyze_certificates = opt_internal_int("ssl_analyze_certificates");
