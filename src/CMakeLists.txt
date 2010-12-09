@@ -193,6 +193,8 @@ binpac_target(netflow.pac
     netflow-protocol.pac netflow-analyzer.pac)
 binpac_target(rpc.pac
     rpc-analyzer.pac portmap-analyzer.pac)
+binpac_target(sebek.pac
+    sebek-protocol.pac sebek-analyzer.pac)
 binpac_target(smb.pac
     smb-protocol.pac smb-pipe.pac smb-mailslot.pac)
 binpac_target(ssl.pac
@@ -331,6 +333,7 @@ set(bro_SRCS
     RuleCondition.cc
     RuleMatcher.cc
     ScriptAnaly.cc
+    Sebek-binpac.cc
     SmithWaterman.cc
     SMB.cc
     SMTP.cc
