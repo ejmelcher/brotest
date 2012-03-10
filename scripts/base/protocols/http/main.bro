@@ -5,6 +5,8 @@
 @load base/utils/numbers
 @load base/utils/files
 
+@load base/frameworks/file-analysis
+
 module HTTP;
 
 export {
@@ -69,6 +71,13 @@ export {
 		
 		## All of the headers that may indicate if the request was proxied.
 		proxied:                 set[string] &log &optional;
+		
+		## Indicates if this request can assume 206 partial content in
+		## response.
+		range_request:           bool      &default=F;
+		## If a data offset is known for the upcoming chunk of data it
+		## should be stored here until after the data chunk has been seen.
+		data_offset:             count     &default=0;
 	};
 	
 	## Structure to maintain state for an HTTP connection with multiple 
@@ -218,15 +227,18 @@ event http_header(c: connection, is_orig: bool, name: string, value: string) &pr
 			# The split is done to remove the occasional port value that shows up here.
 			c$http$host = split1(value, /:/)[1];
 		
+		else if ( name == "RANGE" )
+			c$http$range_request = T;
+		
 		else if ( name == "USER-AGENT" )
 			c$http$user_agent = value;
 		
 		else if ( name in proxy_headers )
-				{
-				if ( ! c$http?$proxied )
-					c$http$proxied = set();
-				add c$http$proxied[fmt("%s -> %s", name, value)];
-				}
+			{
+			if ( ! c$http?$proxied )
+				c$http$proxied = set();
+			add c$http$proxied[fmt("%s -> %s", name, value)];
+			}
 		
 		else if ( name == "AUTHORIZATION" )
 			{
@@ -255,6 +267,20 @@ event http_header(c: connection, is_orig: bool, name: string, value: string) &pr
 		if ( name == "CONTENT-DISPOSITION" &&
 		     /[fF][iI][lL][eE][nN][aA][mM][eE]/ in value )
 			c$http$filename = extract_filename_from_content_disposition(value);
+			
+		else if ( name == "CONTENT-RANGE" )
+			{
+			# example: bytes 0-32767/555523
+			# TODO: make sure the RFC is fully implemented
+			local range_parts = split(value, /[ \-\/=]+/);
+			if ( 2 in range_parts )
+				{
+				c$http$data_offset = to_count(range_parts[2]);
+				#if ( 4 in range_parts )
+				#	FileAnalysis::send_size(c$http$fid, to_count(range_parts[4]));
+				#print fmt("%s data offset: %d  len: %d  total_size: %s", c$uid, c$http$data_offset, to_count(range_parts[3])-c$http$data_offset, range_parts[4]);
+				}
+			}
 		}
 	}
 	

@@ -1,5 +1,6 @@
 ##! Identification of file types in HTTP response bodies with file content sniffing.
 
+@load base/frameworks/file-analysis
 @load base/frameworks/signatures
 @load base/frameworks/notice
 @load ./main
@@ -19,6 +20,10 @@ export {
 	};
 
 	redef record Info += {
+		
+		## Identifier used by the file analysis framework.
+		fid:          string   &optional;
+		
 		## Mime type of response body identified by content sniffing.
 		mime_type:    string   &log &optional;
 		
@@ -26,6 +31,8 @@ export {
 		## seen yet.  After the first :bro:id:`http_entity_data` event, it 
 		## will be set to F.
 		first_chunk:     bool &default=T;
+		
+		bytes: count &default=0;
 	};
 	
 	## Mapping between mime types and regular expressions for URLs
@@ -75,8 +82,28 @@ event signature_match(state: signature_state, msg: string, data: string) &priori
 
 event http_entity_data(c: connection, is_orig: bool, length: count, data: string) &priority=5
 	{
+	# The file id needs to be the URL with the originator ip address if this is a partial content 
+	# response.
+	if ( ! c$http?$fid )
+		c$http$fid = c$http$range_request ? cat(c$id$orig_h,build_url(c$http)) : cat(c$uid,c$http$trans_depth);
+	local offset = c$http$data_offset + c$http$bytes;
+
+	FileAnalysis::send_data(c$http$fid, offset, data);
+	FileAnalysis::send_conn(c$http$fid, c);
+	c$http$bytes += |data|;
+	
 	if ( c$http$first_chunk && ! c$http?$mime_type )
-			c$http$mime_type = split1(identify_data(data, T), /;/)[1];
+		c$http$mime_type = split1(identify_data(data, T), /;/)[1];
+	}
+	
+event http_message_done(c: connection, is_orig: bool, stat: http_message_stat) &priority = -5
+	{
+	if ( ! c$http$range_request )
+		FileAnalysis::send_EOF(cat(c$uid,c$http$trans_depth));
+	
+	delete c$http$bytes;
+	delete c$http$data_offset;
+	delete c$http$fid;
 	}
 	
 event http_entity_data(c: connection, is_orig: bool, length: count, data: string) &priority=-10
