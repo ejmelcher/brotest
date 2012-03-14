@@ -78,6 +78,7 @@ export {
 		## If a data offset is known for the upcoming chunk of data it
 		## should be stored here until after the data chunk has been seen.
 		data_offset:             count     &default=0;
+		file_size:               count     &optional;
 	};
 	
 	## Structure to maintain state for an HTTP connection with multiple 
@@ -276,8 +277,8 @@ event http_header(c: connection, is_orig: bool, name: string, value: string) &pr
 			if ( 2 in range_parts )
 				{
 				c$http$data_offset = to_count(range_parts[2]);
-				#if ( 4 in range_parts )
-				#	FileAnalysis::send_size(c$http$fid, to_count(range_parts[4]));
+				if ( 4 in range_parts )
+					c$http$file_size = to_count(range_parts[4]);
 				#print fmt("%s data offset: %d  len: %d  total_size: %s", c$uid, c$http$data_offset, to_count(range_parts[3])-c$http$data_offset, range_parts[4]);
 				}
 			}

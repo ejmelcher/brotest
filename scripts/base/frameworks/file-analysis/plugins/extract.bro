@@ -34,5 +34,3 @@ event FileAnalysis::linear_data_done(f: Info)
 		event FileAnalysis::trigger(f, EXTRACTED);
 		}
 	}
-
-	

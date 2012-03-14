@@ -5,14 +5,14 @@ redef FileAnalysis::policy += {
 	 
  	#[$trigger = FileAnalysis::IDENTIFIED_NEW_FILE,
  	# $action = FileAnalysis::ACTION_EXTRACT ],
-	
+	#
  	[$trigger = FileAnalysis::IDENTIFIED_MIME,
  	 $pred(rec: FileAnalysis::Info) = { return rec$mime_type == "application/x-dosexec"; },
  	 $action = FileAnalysis::ACTION_HASH_MD5 ],
-	
-	 [$trigger = FileAnalysis::IDENTIFIED_MD5,
-	  $pred(rec: FileAnalysis::Info) = { return rec$mime_type == "application/x-dosexec"; },
-	  $action = FileAnalysis::ACTION_MHR_CHECK],
+	#
+	[$trigger = FileAnalysis::IDENTIFIED_MD5,
+	 $pred(rec: FileAnalysis::Info) = { return rec$mime_type == "application/x-dosexec"; },
+	 $action = FileAnalysis::ACTION_MHR_CHECK],
 	
 	#[$trigger=FileAnalysis::IDENTIFIED_MIME,
 	# $pred(rec: FileAnalysis::Info) = { return rec$meta_data["mime_type"] == "application/x-dosexec"; },
