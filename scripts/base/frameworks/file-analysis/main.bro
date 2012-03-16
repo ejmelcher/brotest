@@ -38,6 +38,10 @@ export {
 	const default_buffer_reassembly_size = 1024*1024 &redef; # 1meg reassembly buffer!
 	const min_chunk_size = 1000;
 	
+	## No plugins can take longer than this to return if they
+	## want to include data into the file analysis log.
+	const max_logging_delay = 15secs &redef;
+	
 	type Info: record {
 		## The internal identifier used while this file was being tracked.
 		fid:  string &log;
@@ -76,6 +80,18 @@ export {
 		## chunk of data will be stored in this vector.
 		buffer: vector of DataBuffer &optional;
 		buffered_bytes: count &default=0;
+		
+		## Tickets to delay logging this file.
+		## This is used by plugins that need a short interval before they 
+		## have their data collected for logging.
+		log_delay_tickets: count &default=0;
+		
+		## This is set to the network time when this file is first attempted
+		## to be logged.  If it's not ready to be logged due to outstand log
+		## delay tickets, it will be delayed up to bro:id:`max_logging_delay`.
+		first_done_ts: time &optional;
+		
+		reassembly_buffer_overflow: bool &default=F;
 	};
 	
 	type PolicyItem: record {
@@ -168,6 +184,22 @@ function get_file(id: string): Info
 		return file_tracker[id];
 		}
 	}
+	
+event FileAnalysis::file_done(f: Info)
+	{
+	if ( ! f?$first_done_ts )
+		f$first_done_ts = network_time();
+	
+	if ( f$log_delay_tickets == 0 || f$first_done_ts+max_logging_delay < network_time() )
+		{
+		Log::write(LOG, f);
+		delete file_tracker[f$fid];
+		}
+	else
+		{
+		schedule 1sec { FileAnalysis::file_done(f) };
+		}
+	}
 
 function chunk_sorter(a: DataBuffer, b: DataBuffer): int
 	{
@@ -195,7 +227,6 @@ function reassemble_buffers(fl: Info)
 	#if ( fl$buffered_bytes > fl$buffered_reassembly_bytes )
 	if ( fl?$buffer )
 		{
-		#print "working with buffer";
 		sort(fl$buffer, chunk_sorter);
 		local new_buffer: vector of DataBuffer = vector();
 		local kept_last_buffer = F;
@@ -210,32 +241,21 @@ function reassemble_buffers(fl: Info)
 				# Throw out this buffer if linear data has already bypassed it
 				# It's essentially redundant data at this point.
 				fl$buffered_bytes -= chunk$len;
-				#print "next!";
 				next;
 				}
-				
-			#print fmt("chunk length in reassembly buffer: %d -- chunk offset:%d", chunk$len, chunk$offset);
 			
 			if ( kept_last_buffer && 
 			     new_buffer[|new_buffer|-1]$offset+new_buffer[|new_buffer|-1]$len >= chunk$offset )
 				{
-				#print fl$buffer[i-1]$len;
-				#print chunk$len;
-				
-				#print "combining buffers!";
 				chunk = combine_buffers(new_buffer[|new_buffer|-1], chunk);
-				#print fl$buffer[i-1]$len;
-				#print chunk$len;
-				}
+			}
 			
 			if ( min_chunk_size <= chunk$len && chunk$offset == fl$linear_data_offset )
 				{
-				#print "reassembled!";
 				# Pull back on total buffered counter.
 				fl$buffered_bytes -= chunk$len;
 				
 				FileAnalysis::send_data(fl, fl$protocol, chunk$offset, chunk$data);
-				#print "sent linear data";
 				# Delete the buffer element after sending it to linear_data;
 				# I avoid this for now by creating a new buffer of unused 
 				# DataBuffers.
@@ -251,14 +271,11 @@ function reassemble_buffers(fl: Info)
 					# to keep it around.
 					new_buffer[|new_buffer|] = chunk;
 					
-				#print "keeping the buffer";
 				kept_last_buffer = T;
 				}
 			}
 		fl$buffer = new_buffer;
-		#print fl$buffer;
 		}
-	
 	}
 
 function send_data(id: Info, protocol: string, offset: count, data: string)
@@ -266,12 +283,6 @@ function send_data(id: Info, protocol: string, offset: count, data: string)
 	#local fl = get_file(id);
 	local fl = id;
 	
-	if ( |data| > 1 )
-		{
-		#print "Got reassembled data!";
-		#print fmt("linear data offset:%d -- offset:%d -- |data|:%d", fl$linear_data_offset, offset, |data|);
-		}
-		
 	fl$protocol = protocol;
 	
 	if ( (min_chunk_size <= |data| && offset <= fl$linear_data_offset) || 
@@ -302,7 +313,6 @@ function send_data(id: Info, protocol: string, offset: count, data: string)
 		if ( fl?$size && fl$linear_data_offset == fl$size )
 			{
 			event FileAnalysis::linear_data_done(fl);
-			delete file_tracker[id$fid];
 			}
 		}
 	#if ( fl$buffered_bytes < fl$buffered_reassembly_bytes && offset != fl$linear_data_offset )
@@ -322,12 +332,9 @@ function send_data(id: Info, protocol: string, offset: count, data: string)
 	# Check if the reassembly buffer is still full even after 
 	if ( fl$buffered_bytes > fl$buffered_reassembly_bytes )
 		{
-		#print "reassembly buffer overflow";
-		delete file_tracker[id$fid];
+		fl$reassembly_buffer_overflow = T;
+		event file_done(fl);
 		}
-		
-	#print "";
-	#print "";
 	}
 
 function send_EOF(id: Info)
@@ -360,7 +367,7 @@ function send_size(id: Info, size: count)
 	fl$size = size;
 	}
 	
-event trigger(f: Info, trig: Trigger)
+event FileAnalysis::trigger(f: Info, trig: Trigger)
 	{
 	# TODO: optimize this
 	for ( pi in policy )
@@ -369,23 +376,17 @@ event trigger(f: Info, trig: Trigger)
 			 ( ! pi?$pred || pi$pred(f) ) )
 			{
 			add f$actions[pi$action];
-			#print "matched a file analysis policy item!";
-			#print f;
+			
 			if ( pi$action in action_dependencies )
 				for ( dep_action in action_dependencies[pi$action] )
+					{
 					add f$actions[dep_action];
+					# Make it stop!!!  This deals with dependencies of dependencies. :(
+					for ( dep_dep_action in action_dependencies[dep_action] )
+						add f$actions[dep_dep_action];
+					}
 			}
 		}
-	}
-
-event FileAnalysis::linear_data(f: Info, data: string) &priority=10
-	{
-	# Push the lienar data offset forward.
-	#f$linear_data_offset += |data|;
-	# If the linear data offset has reached the full file size
-	# we should send the event to indicate the end of linear data.
-	#if ( f$linear_data_offset == f$size-1 )
-	#	event FileAnalysis::linear_data_done(f);
 	}
 
 event FileAnalysis::linear_data_done(f: Info) &priority=-10
@@ -395,7 +396,7 @@ event FileAnalysis::linear_data_done(f: Info) &priority=-10
 	if ( |f$uids| > 0 )
 		{
 		f$size = f$linear_data_offset;
-		Log::write(LOG, f);
+		event FileAnalysis::file_done(f);
 		}
 	}
 
