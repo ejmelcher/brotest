@@ -20,7 +20,7 @@ type Val: record {
 
 global sha_file_map: table[string] of Info = {};
 
-event sha_line(desc: Input::EventDescription, tpe: Input::Event, s: string) {
+event sha_line(desc: Input::EventDescription, tpe: Input::Event, s: string)
 	{
 	# The data from shasum is a single line long so we remove the input right away.
 	Input::remove(desc$name);
