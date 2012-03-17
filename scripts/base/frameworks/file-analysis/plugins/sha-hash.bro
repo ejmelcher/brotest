@@ -20,8 +20,13 @@ type Val: record {
 
 global sha_file_map: table[string] of Info = {};
 
-event sha_line(tpe: Input::Event, s: string)
+event sha_line(desc: Input::EventDescription, tpe: Input::Event, s: string) {
 	{
+	# The data from shasum is a single line long so we remove the input right away.
+	Input::remove(desc$name);
+	# Remove the results file from disk.
+	system(fmt("unlink %s", desc$source));
+
 	local parts = split(s, /[[:blank:]]+/);
 	if ( |parts| == 2 )
 		{
@@ -42,18 +47,11 @@ event sha_line(tpe: Input::Event, s: string)
 
 event add_sha_input(f: Info)
 	{
-	
 	Input::add_event([$name=fmt("sha_hash::%s", get_file_name(f$disk_file)),
 	                  $source=fmt("%s.sha_hash", get_file_name(f$disk_file)),
 	                  $fields=Val,
 	                  $ev=sha_line,
 	                  $reader=Input::READER_RAW]);
-	
-	
-	#Input::create_stream(FileAnalysis::SHASUM, [$source=fmt("%s.sha_hash", get_file_name(f$disk_file)), $reader=Input::READER_RAW, $mode=Input::REREAD]);
-	#Input::add_eventfilter(FileAnalysis::SHASUM, [$name="whatever", $fields=Val, $ev=sha_line]);
-	#Input::remove_eventfilter(FileAnalysis::SHASUM, "whatever");
-	#Input::remove_stream(FileAnalysis::SHASUM);
 	}
 
 event FileAnalysis::linear_data_done(f: Info)

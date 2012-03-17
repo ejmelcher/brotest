@@ -82,13 +82,13 @@ event signature_match(state: signature_state, msg: string, data: string) &priori
 
 event http_entity_data(c: connection, is_orig: bool, length: count, data: string) &priority=5
 	{
-	# The file id needs to be the URL with the originator ip address if this is a partial content 
-	# response.
-	if ( ! c$http?$fid )
-		c$http$fid = FileAnalysis::get_file(c$http$range_request ? cat(is_orig,c$id$orig_h,build_url(c$http)) : cat(is_orig,c$uid,c$http$trans_depth));
-	
 	if ( ! is_orig )
 		{
+		# The file id needs to be the URL with the originator ip address if this is a partial content 
+		# response.
+		if ( ! c$http?$fid )
+			c$http$fid = FileAnalysis::get_file(c$http$range_request ? cat(is_orig,c$id$orig_h,build_url(c$http)) : cat(is_orig,c$uid,c$http$trans_depth));
+		
 		if ( c$http?$file_size)
 			FileAnalysis::send_size(c$http$fid, c$http$file_size);
 		
@@ -100,7 +100,7 @@ event http_entity_data(c: connection, is_orig: bool, length: count, data: string
 		}
 	}
 	
-event http_message_done(c: connection, is_orig: bool, stat: http_message_stat) &priority = -4
+event http_message_done(c: connection, is_orig: bool, stat: http_message_stat) &priority = 5
 	{
 	if ( is_orig )
 		return;
@@ -109,16 +109,18 @@ event http_message_done(c: connection, is_orig: bool, stat: http_message_stat) &
 	# response.
 	if ( ! c$http?$fid )
 		c$http$fid = FileAnalysis::get_file(c$http$range_request ? cat(is_orig,c$id$orig_h,build_url(c$http)) : cat(is_orig,c$uid,c$http$trans_depth));
+	}	
+
+event http_message_done(c: connection, is_orig: bool, stat: http_message_stat) &priority = -4
+	{
+	if ( is_orig )
+		return;
 	
 	if ( ! c$http$range_request )
 		FileAnalysis::send_EOF(c$http$fid);
 	
 	if ( c$http$fid?$mime_type )
-		{
-		print "adding a miemtype";
-		print c$http$fid$mime_type;
 		c$http$mime_type = c$http$fid$mime_type;
-		}
 		
 	delete c$http$bytes;
 	delete c$http$data_offset;

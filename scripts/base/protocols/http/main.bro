@@ -282,6 +282,10 @@ event http_header(c: connection, is_orig: bool, name: string, value: string) &pr
 				#print fmt("%s data offset: %d  len: %d  total_size: %s", c$uid, c$http$data_offset, to_count(range_parts[3])-c$http$data_offset, range_parts[4]);
 				}
 			}
+		else if ( name == "CONTENT-LENGTH" )
+			{
+			c$http$file_size = to_count(value);
+			}
 		}
 	}
 	

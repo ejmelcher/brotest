@@ -2,7 +2,6 @@
 
 @load ./extract
 @load ./hash
-@load ./sha-hash
 
 module VirusTotal;
 
@@ -47,6 +46,8 @@ event VirusTotal::line(desc: Input::EventDescription, tpe: Input::Event, s: stri
 	
 	# The data from virus total is a single line long so we remove the input right away.
 	Input::remove(desc$name);
+	# Remove the results file from disk.
+	system(fmt("unlink %s", desc$source));
 	
 	# I'm parsing JSON this way.  Kill me now.
 	local parts = split(s, / ?\{/ | /\}, /);
@@ -119,5 +120,6 @@ event VirusTotal::report(f: FileAnalysis::Info, report: VirusTotal::Results)
 	
 	NOTICE([$note=VirusTotal::Match,
 	        $msg=fmt("A file with md5sum matched %d engines on VirusTotal", |report$hits|),
+	        $sub=report$permalink,
 	        $src=downloader]);
 	}
