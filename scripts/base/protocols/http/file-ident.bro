@@ -89,11 +89,11 @@ event http_entity_data(c: connection, is_orig: bool, length: count, data: string
 		if ( ! c$http?$fid )
 			c$http$fid = FileAnalysis::get_file(c$http$range_request ? cat(is_orig,c$id$orig_h,build_url(c$http)) : cat(is_orig,c$uid,c$http$trans_depth));
 		
-		if ( c$http?$file_size)
+		if ( c$http?$file_size )
 			FileAnalysis::send_size(c$http$fid, c$http$file_size);
 		
 		local offset = c$http$data_offset + c$http$bytes;
-	
+		
 		FileAnalysis::send_conn(c$http$fid, c);
 		FileAnalysis::send_data(c$http$fid, "HTTP", offset, data);
 		c$http$bytes += |data|;
@@ -116,8 +116,8 @@ event http_message_done(c: connection, is_orig: bool, stat: http_message_stat) &
 	if ( is_orig )
 		return;
 	
-	if ( ! c$http$range_request )
-		FileAnalysis::send_EOF(c$http$fid);
+	#if ( ! c$http$range_request )
+	#	FileAnalysis::send_EOD(c$http$fid);
 	
 	if ( c$http$fid?$mime_type )
 		c$http$mime_type = c$http$fid$mime_type;

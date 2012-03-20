@@ -136,7 +136,7 @@ event mime_end_entity(c: connection) &priority=-5
 	if ( c$smtp$current_entity$content_len > 0 )
 		Log::write(SMTP::ENTITIES_LOG, c$smtp$current_entity);
 	
-	FileAnalysis::send_EOF(c$smtp$current_entity$fid);
+	FileAnalysis::send_EOD(c$smtp$current_entity$fid);
 	delete c$smtp$current_entity;
 	}
 
