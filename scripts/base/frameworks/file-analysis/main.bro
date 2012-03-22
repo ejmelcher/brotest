@@ -92,6 +92,8 @@ export {
 		first_done_ts: time &optional;
 		
 		reassembly_buffer_overflow: bool &default=F;
+		reassembled_data: bool &default=F;
+		possible_reassembly: bool &default=F;
 	};
 	
 	type PolicyItem: record {
@@ -224,9 +226,10 @@ function reassemble_buffers(f: Info)
 	# Deal with a full reassembly buffer
 	if ( f?$buffer )
 		{
+		local buffered_bytes = 0;
 		sort(f$buffer, chunk_sorter);
 		local new_buffer: vector of DataBuffer = vector();
-		local kept_last_buffer = F;
+		local forwarded_last_buffer = T;
 		
 		for ( i in f$buffer )
 			{
@@ -241,37 +244,44 @@ function reassemble_buffers(f: Info)
 				next;
 				}
 			
-			if ( kept_last_buffer && 
+			if ( ! forwarded_last_buffer && 
 			     new_buffer[|new_buffer|-1]$offset+new_buffer[|new_buffer|-1]$len >= chunk$offset )
 				{
+				local combined_chunk_len = chunk$len + new_buffer[|new_buffer|-1]$len;
 				chunk = combine_buffers(new_buffer[|new_buffer|-1], chunk);
+				# Adjust the buffered bytes for any snipped/overlapping bytes.
+				#f$buffered_bytes -= combined_chunk_len - chunk$len;
 				}
 			
 			if ( min_chunk_size <= chunk$len && chunk$offset == f$linear_data_offset )
 				{
 				# Pull back on total buffered counter.
-				f$buffered_bytes -= chunk$len;
+				if ( f$buffered_bytes > 0 )
+					f$buffered_bytes -= chunk$len;
 				
+				f$reassembled_data = T;
 				FileAnalysis::send_data(f, f$protocol, chunk$offset, chunk$data);
+				f$reassembled_data = F;
 				# Delete the buffer element after sending it to linear_data;
 				# I avoid this for now by creating a new buffer of unused 
 				# DataBuffers.
 				#delete f$buffer[i]; <- Ack!  We need to be able to delete arbitrary elements!
-				kept_last_buffer = F;
+				forwarded_last_buffer = T;
 				}
 			else
 				{
-				if ( kept_last_buffer )
+				if ( ! forwarded_last_buffer )
 					new_buffer[|new_buffer|-1] = chunk;
 				else
-					# The current chunk didn't get passed to linear_data so we need
-					# to keep it around.
 					new_buffer[|new_buffer|] = chunk;
-					
-				kept_last_buffer = T;
+				
+				buffered_bytes += chunk$len;
+				forwarded_last_buffer = F;
 				}
 			}
 		f$buffer = new_buffer;
+		f$buffered_bytes = buffered_bytes;
+		f$possible_reassembly = F;
 		}
 	}
 
@@ -279,6 +289,7 @@ function send_data(f: Info, protocol: string, offset: count, data: string)
 	{
 	f$protocol = protocol;
 	
+	#print fmt("linear offset: %d - offset: %d - data len: %d", f$linear_data_offset, offset, |data|);
 	if ( (min_chunk_size <= |data| && offset <= f$linear_data_offset) || 
 		 (f?$size && f$size == f$linear_data_offset+|data|) )
 		{
@@ -298,7 +309,7 @@ function send_data(f: Info, protocol: string, offset: count, data: string)
 		
 		# Push the linear data offset forward.
 		f$linear_data_offset += |local_data|;
-		
+
 		# Send the data to the linear_data event.
 		event FileAnalysis::linear_data(f, local_data);
 
@@ -310,15 +321,19 @@ function send_data(f: Info, protocol: string, offset: count, data: string)
 			event FileAnalysis::linear_data_done(f);
 			}
 		}
-	else
+	else if ( ! f$reassembled_data )
 		{
 		if ( ! f?$buffer )
 			f$buffer = vector();
 		
 		f$buffer[|f$buffer|] = [$offset=offset, $data=data, $len=|data|];
 		f$buffered_bytes += |data|;
-		
-		if ( f$buffered_bytes > min_chunk_size && offset <= f$linear_data_offset )
+
+		if ( offset <= f$linear_data_offset && offset+|data| >= f$linear_data_offset )
+			f$possible_reassembly = T;
+
+		#print fmt("buffered bytes: %d buffered elements: %d", f$buffered_bytes, |f$buffer|);
+		if ( f$buffered_bytes > min_chunk_size && f$possible_reassembly )
 			reassemble_buffers(f);
 		return;
 		}
@@ -326,7 +341,7 @@ function send_data(f: Info, protocol: string, offset: count, data: string)
 	if ( f$buffered_bytes > f$buffered_reassembly_bytes )
 		{
 		f$reassembly_buffer_overflow = T;
-		print "reassembly overflow";
+		#print "reassembly overflow";
 		event file_done(f);
 		}
 	}
@@ -392,7 +407,7 @@ event bro_done()
 	{
 	for ( fid in file_tracker )
 		{
-		print file_tracker[fid];
+		#print file_tracker[fid];
 		#event FileAnalysis::linear_data_done(file_tracker[fid]);
 		}
 	}

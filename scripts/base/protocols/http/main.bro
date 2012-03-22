@@ -284,7 +284,8 @@ event http_header(c: connection, is_orig: bool, name: string, value: string) &pr
 			}
 		else if ( name == "CONTENT-LENGTH" )
 			{
-			c$http$file_size = to_count(value);
+			if ( ! c$http?$file_size )
+				c$http$file_size = to_count(value);
 			}
 		}
 	}
