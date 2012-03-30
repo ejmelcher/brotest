@@ -11,7 +11,7 @@ export {
 	};
 }
 
-event FileAnalysis::linear_data(f: Info, data: string)
+event FileAnalysis::linear_data(f: Info, data: string) &priority=5
 	{
 	if ( ACTION_HASH_MD5 in f$actions )
 		{
@@ -21,16 +21,14 @@ event FileAnalysis::linear_data(f: Info, data: string)
 			md5_hash_init(f$fid);
 			}
 	
-		#print "add data to hash";
 		md5_hash_update(f$fid, data);
 		}
 	}
 
-event FileAnalysis::linear_data_done(f: Info)
+event FileAnalysis::linear_data_done(f: Info) &priority=5
 	{
 	if ( f$calc_md5 )
 		{
-		#print "closed hash";
 		f$md5 = md5_hash_finish(f$fid);
 		event FileAnalysis::trigger(f, IDENTIFIED_MD5);
 		}

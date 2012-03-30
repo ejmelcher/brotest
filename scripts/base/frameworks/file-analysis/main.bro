@@ -84,7 +84,7 @@ export {
 		## Tickets to delay logging this file.
 		## This is used by plugins that need a short interval before they 
 		## have their data collected for logging.
-		log_delay_tickets: count &default=0;
+		delay_tickets: set[string] &default=set();
 		
 		## This is set to the network time when this file is first attempted
 		## to be logged.  If it's not ready to be logged due to outstand log
@@ -158,14 +158,14 @@ event bro_init() &priority=5
 
 # A variable for tracking all of the active files.
 # It's indexed by the "id" used for the file so that it should remain globally unique.
-global file_tracker: table[string] of Info = table();
+global tracker: table[string] of Info = table() &read_expire=10min &redef;
 
 function get_file(id: string): Info
 	{
 	local fid = md5_hmac(id);
-	if ( fid in file_tracker )
+	if ( fid in tracker )
 		{
-		return file_tracker[fid];
+		return tracker[fid];
 		}
 	else
 		{
@@ -176,28 +176,12 @@ function get_file(id: string): Info
 		this_file$actions=set();
 		this_file$uids=set();
 		this_file$cids=set();
-		file_tracker[fid] = this_file;
+		tracker[fid] = this_file;
 		
 		# Send the new file trigger
-		event FileAnalysis::trigger(file_tracker[fid], IDENTIFIED_NEW_FILE);
+		event FileAnalysis::trigger(tracker[fid], IDENTIFIED_NEW_FILE);
 		
-		return file_tracker[fid];
-		}
-	}
-	
-event FileAnalysis::file_done(f: Info)
-	{
-	if ( ! f?$first_done_ts )
-		f$first_done_ts = network_time();
-	
-	if ( f$log_delay_tickets == 0 || f$first_done_ts+max_logging_delay < network_time() )
-		{
-		Log::write(LOG, f);
-		delete file_tracker[f$fid];
-		}
-	else
-		{
-		schedule 1sec { FileAnalysis::file_done(f) };
+		return tracker[fid];
 		}
 	}
 
@@ -285,6 +269,22 @@ function reassemble_buffers(f: Info)
 		}
 	}
 
+event FileAnalysis::file_done(f: Info) &priority=5
+	{
+	if ( ! f?$first_done_ts )
+		f$first_done_ts = network_time();
+	
+	if ( |f$delay_tickets| == 0 || f$first_done_ts+max_logging_delay < network_time() )
+		{
+		Log::write(LOG, f);
+		delete tracker[f$fid];
+		}
+	else
+		{
+		schedule 1sec { FileAnalysis::file_done(f) };
+		}
+	}
+
 function send_data(f: Info, protocol: string, offset: count, data: string)
 	{
 	f$protocol = protocol;
@@ -342,7 +342,7 @@ function send_data(f: Info, protocol: string, offset: count, data: string)
 		{
 		f$reassembly_buffer_overflow = T;
 		#print "reassembly overflow";
-		event file_done(f);
+		event FileAnalysis::file_done(f);
 		}
 	}
 
@@ -368,7 +368,7 @@ function send_size(f: Info, size: count)
 	f$size = size;
 	}
 	
-event FileAnalysis::trigger(f: Info, trig: Trigger)
+event FileAnalysis::trigger(f: Info, trig: Trigger) &priority=5
 	{
 	# TODO: optimize this
 	for ( pi in policy )
@@ -396,7 +396,7 @@ event FileAnalysis::linear_data_done(f: Info) &priority=-10
 	{
 	# The file must have at least one connection and some size 
 	# associated with it before we are willing to log it.
-	if ( f$size > 0 && |f$uids| > 0 )
+	if ( f?$size && f$size > 0 && |f$uids| > 0 )
 		{
 		f$size = f$linear_data_offset;
 		event FileAnalysis::file_done(f);
@@ -405,9 +405,9 @@ event FileAnalysis::linear_data_done(f: Info) &priority=-10
 
 event bro_done()
 	{
-	for ( fid in file_tracker )
+	for ( fid in tracker )
 		{
-		#print file_tracker[fid];
-		#event FileAnalysis::linear_data_done(file_tracker[fid]);
+		#print tracker[fid];
+		#event FileAnalysis::linear_data_done(tracker[fid]);
 		}
 	}

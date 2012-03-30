@@ -1,6 +1,5 @@
 @load base/frameworks/notice
 
-@load ./extract
 @load ./hash
 
 module VirusTotal;
@@ -8,7 +7,8 @@ module VirusTotal;
 export {
 	redef enum Notice::Type += { Match };
 
-	redef enum FileAnalysis::Action += { ACTION_HASH_MATCH };
+	redef enum FileAnalysis::Action  += { ACTION_HASH_MATCH };
+	redef enum FileAnalysis::Trigger += { IDENTIFIED };
 	
 	type Results: record {
 		sent_file: bool                    &default=F;
@@ -20,9 +20,10 @@ export {
 	## This is your VirusTotal API key and *must* be supplied for this plugin to work.
 	const api_key = "" &redef;
 	
-	## Define the number of queries per minute that your user can make.
+	## Define the number of queries per minute that your API key can make.
 	const queries_per_minute = 4 &redef;
 	
+	## Handle this event to get the result of a virus total report.
 	global report: event(f: FileAnalysis::Info, report: VirusTotal::Results);
 }
 
@@ -32,7 +33,7 @@ redef FileAnalysis::action_dependencies += { [ACTION_HASH_MATCH] = actions };
 # Help abide by the virus total query limits
 global query_limiter: set[string] &create_expire=1min;
 
-type VTVal: record {
+type Val: record {
 	s: string;
 };
 
@@ -83,7 +84,7 @@ event add_vt_input(f: FileAnalysis::Info, name: string)
 	{
 	Input::add_event([$name=name, 
 	                  $source=fmt("%s.vt_result", f$md5),
-	                  $fields=VTVal,
+	                  $fields=Val,
 	                  $ev=VirusTotal::line,
 	                  $reader=Input::READER_RAW, $mode=Input::MANUAL]);
 	}

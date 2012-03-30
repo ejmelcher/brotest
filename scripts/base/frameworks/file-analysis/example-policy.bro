@@ -1,10 +1,11 @@
+# This file is intended to be deleted eventually.
 
 redef FileAnalysis::policy += {
 	#[$trigger=FileAnalysis::IDENTIFIED_NEW_FILE,
 	# $action = FileAnalysis::ACTION_SNIFF_MIME ],
 	
-	[$trigger = FileAnalysis::IDENTIFIED_NEW_FILE,
-	 $action = FileAnalysis::ACTION_EXTRACT ],
+	#[$trigger = FileAnalysis::IDENTIFIED_NEW_FILE,
+	# $action = FileAnalysis::ACTION_EXTRACT ],
 	
 	#[$trigger = FileAnalysis::IDENTIFIED_MIME,
 	# $pred(rec: FileAnalysis::Info) = { return rec$mime_type == "application/x-dosexec"; },

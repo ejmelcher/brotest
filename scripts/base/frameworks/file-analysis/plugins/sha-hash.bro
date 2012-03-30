@@ -36,7 +36,7 @@ event sha_line(desc: Input::EventDescription, tpe: Input::Event, s: string)
 			{
 			sha_file_map[filename]$sha1 = hash;
 			## Release the delay ticket.
-			--sha_file_map[filename]$log_delay_tickets;
+			delete sha_file_map[filename]$delay_tickets["sha-hash"];
 			
 			event FileAnalysis::trigger(sha_file_map[filename], IDENTIFIED_SHA1);
 			
@@ -58,7 +58,7 @@ event FileAnalysis::linear_data_done(f: Info)
 	{
 	if ( ACTION_HASH_SHA1 in f$actions && f?$disk_file )
 		{
-		++f$log_delay_tickets;
+		add f$delay_tickets["sha-hash"];
 		system(fmt("shasum \"%s\" > %s.sha_hash", get_file_name(f$disk_file), get_file_name(f$disk_file)));
 		sha_file_map[get_file_name(f$disk_file)] = f;
 		schedule 1sec { add_sha_input(f) };
