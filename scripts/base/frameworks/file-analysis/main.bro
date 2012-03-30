@@ -384,7 +384,7 @@ event FileAnalysis::trigger(f: Info, trig: Trigger) &priority=5
 					{
 					add f$actions[dep_action];
 					# Make it stop!!!  This deals with dependencies of dependencies. :(
-					for ( dep_dep_action in action_dependencies[dep_action] )
+					for ( dep_dep_action in action_dependencies[pi$action][dep_action] )
 						add f$actions[dep_dep_action];
 					}
 				}
