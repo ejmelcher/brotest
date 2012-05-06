@@ -5,8 +5,6 @@
 
 #include "TCP.h"
 
-#include <magic.h>
-
 class File_Analyzer : public TCP_ApplicationAnalyzer {
 public:
 	File_Analyzer(Connection* conn);
@@ -18,21 +16,14 @@ public:
 	static Analyzer* InstantiateAnalyzer(Connection* conn)
 		{ return new File_Analyzer(conn); }
 
-	static bool Available()	{ return file_transferred; }
+	static bool Available()	{ return file_data || file_done; }
 
 protected:
 	File_Analyzer()	{}
 
-	void Identify();
-
-	static const int BUFFER_SIZE = 1024;
-	char buffer[BUFFER_SIZE];
-	int buffer_len;
-
-	static void InitMagic(magic_t* magic, int flags);
-
-	static magic_t magic;
-	static magic_t magic_mime;
+	//static const int BUFFER_SIZE = 1024;
+	//char buffer[BUFFER_SIZE];
+	//int buffer_len;
 };
 
 #endif

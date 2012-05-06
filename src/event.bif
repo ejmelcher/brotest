@@ -5816,7 +5816,9 @@ event irc_password_message%(c: connection, is_orig: bool, password: string%);
 ## TODO.
 ##
 ## .. bro:see::
-event file_transferred%(c: connection, prefix: string, descr: string, mime_type: string%);
+event file_data%(c: connection, is_orig: bool, data: string%);
+event file_done%(c: connection%);
+
 
 ## Generated for monitored Syslog messages.
 ##

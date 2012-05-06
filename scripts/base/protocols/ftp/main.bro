@@ -6,6 +6,7 @@
 @load ./utils-commands
 @load base/utils/paths
 @load base/utils/numbers
+@load base/frameworks/file-analysis
 
 module FTP;
 
@@ -317,20 +318,35 @@ event expected_connection_seen(c: connection, a: count) &priority=10
 		add c$service["ftp-data"];
 	}
 
-event file_transferred(c: connection, prefix: string, descr: string,
-			mime_type: string) &priority=5
+event file_data(c: connection, is_orig: bool, data: string) &priority=5
 	{
-	local id = c$id;
-	if ( [id$resp_h, id$resp_p] in ftp_data_expected )
+	if ( ! c?$file_analyzer_info )
 		{
-		local s = ftp_data_expected[id$resp_h, id$resp_p];
-		s$mime_type = split1(mime_type, /;/)[1];
-		s$mime_desc = descr;
+		c$file_analyzer_info = FileAnalysis::get_file(cat(c$id));
+		FileAnalysis::send_conn(c$file_analyzer_info, c);
 		}
+	
+	# We can use the linear data offset here because FTP can only 
+	# do complete and linear file transfers.
+	FileAnalysis::send_data(c$file_analyzer_info, "FTP", c$file_analyzer_info$linear_data_offset, data);
+	}
+
+event file_done(c: connection) &priority=5
+	{
+	if ( c$file_analyzer_info?$mime_type )
+		{
+		local id = c$id;
+		if ( [id$resp_h, id$resp_p] in ftp_data_expected )
+			{
+			local s = ftp_data_expected[id$resp_h, id$resp_p];
+			s$mime_type = c$file_analyzer_info$mime_type;
+			}
+		}
+	
+	FileAnalysis::send_EOD(c$file_analyzer_info);
 	}
 	
-event file_transferred(c: connection, prefix: string, descr: string,
-			mime_type: string) &priority=-5
+event file_done(c: connection) &priority=-5
 	{
 	local id = c$id;
 	if ( [id$resp_h, id$resp_p] in ftp_data_expected )
