@@ -28,7 +28,7 @@ void FragTimer::Dispatch(double t, int /* is_expire */)
 FragReassembler::FragReassembler(NetSessions* arg_s,
 			const IP_Hdr* ip, const u_char* pkt,
 			HashKey* k, double t)
-: Reassembler(0, ip->DstAddr(), REASSEM_IP)
+	: Reassembler(0, REASSEM_IP)
 	{
 	s = arg_s;
 	key = k;
@@ -52,8 +52,6 @@ FragReassembler::FragReassembler(NetSessions* arg_s,
 	frag_size = 0;	// flag meaning "not known"
 	next_proto = ip->NextProto();
 
-	AddFragment(t, ip, pkt);
-
 	if ( frag_timeout != 0.0 )
 		{
 		expire_timer = new FragTimer(this, t + frag_timeout);
@@ -61,6 +59,8 @@ FragReassembler::FragReassembler(NetSessions* arg_s,
 		}
 	else
 		expire_timer = 0;
+
+	AddFragment(t, ip, pkt);
 	}
 
 FragReassembler::~FragReassembler()
@@ -150,7 +150,7 @@ void FragReassembler::AddFragment(double t, const IP_Hdr* ip, const u_char* pkt)
 
 void FragReassembler::Overlap(const u_char* b1, const u_char* b2, int n)
 	{
-	IP_Hdr proto_h(proto_hdr, false);
+	IP_Hdr proto_h(proto_hdr, false, proto_hdr_len);
 
 	if ( memcmp((const void*) b1, (const void*) b2, n) )
 		s->Weird("fragment_inconsistency", &proto_h);
@@ -182,7 +182,7 @@ void FragReassembler::BlockInserted(DataBlock* /* start_block */)
 			// can happen for benign reasons when we're
 			// intermingling parts of two fragmented packets.
 
-			IP_Hdr proto_h(proto_hdr, false);
+			IP_Hdr proto_h(proto_hdr, false, proto_hdr_len);
 			s->Weird("fragment_size_inconsistency", &proto_h);
 
 			// We decide to analyze the contiguous portion now.
@@ -196,7 +196,7 @@ void FragReassembler::BlockInserted(DataBlock* /* start_block */)
 
 	else if ( last_block->upper > frag_size )
 		{
-		IP_Hdr proto_h(proto_hdr, false);
+		IP_Hdr proto_h(proto_hdr, false, proto_hdr_len);
 		s->Weird("fragment_size_inconsistency", &proto_h);
 		frag_size = last_block->upper;
 		}
@@ -250,8 +250,8 @@ void FragReassembler::BlockInserted(DataBlock* /* start_block */)
 		{
 		struct ip6_hdr* reassem6 = (struct ip6_hdr*) pkt_start;
 		reassem6->ip6_plen = htons(frag_size + proto_hdr_len - 40);
-		const IPv6_Hdr_Chain* chain = new IPv6_Hdr_Chain(reassem6, next_proto);
-		reassembled_pkt = new IP_Hdr(reassem6, true, chain);
+		const IPv6_Hdr_Chain* chain = new IPv6_Hdr_Chain(reassem6, next_proto, n);
+		reassembled_pkt = new IP_Hdr(reassem6, true, n, chain);
 		}
 
 	else

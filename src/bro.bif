@@ -6,13 +6,13 @@
 
 %%{ // C segment
 #include <math.h>
-
 #include <vector>
 #include <algorithm>
 #include <cmath>
 #include <sys/stat.h>
 #include <cstdio>
 
+#include "digest.h"
 #include "Reporter.h"
 #include "IPAddr.h"
 
@@ -530,7 +530,7 @@ function piped_exec%(program: string, to_write: string%): bool
 %%{
 static void hash_md5_val(val_list& vlist, unsigned char digest[16])
 	{
-	md5_state_s h;
+	MD5_CTX h;
 
 	md5_init(&h);
 	loop_over_list(vlist, i)
@@ -539,16 +539,16 @@ static void hash_md5_val(val_list& vlist, unsigned char digest[16])
 		if ( v->Type()->Tag() == TYPE_STRING )
 			{
 			const BroString* str = v->AsString();
-			md5_append(&h, str->Bytes(), str->Len());
+			md5_update(&h, str->Bytes(), str->Len());
 			}
 		else
 			{
 			ODesc d(DESC_BINARY);
 			v->Describe(&d);
-			md5_append(&h, (const md5_byte_t *) d.Bytes(), d.Len());
+			md5_update(&h, (const u_char *) d.Bytes(), d.Len());
 			}
 		}
-	md5_finish(&h, digest);
+	md5_final(&h, digest);
 	}
 
 static void hmac_md5_val(val_list& vlist, unsigned char digest[16])
@@ -556,7 +556,53 @@ static void hmac_md5_val(val_list& vlist, unsigned char digest[16])
 	hash_md5_val(vlist, digest);
 	for ( int i = 0; i < 16; ++i )
 		digest[i] = digest[i] ^ shared_hmac_md5_key[i];
-	hash_md5(16, digest, digest);
+	MD5(digest, 16, digest);
+	}
+
+static void hash_sha1_val(val_list& vlist, unsigned char digest[20])
+	{
+	SHA_CTX h;
+
+	sha1_init(&h);
+	loop_over_list(vlist, i)
+		{
+		Val* v = vlist[i];
+		if ( v->Type()->Tag() == TYPE_STRING )
+			{
+			const BroString* str = v->AsString();
+			sha1_update(&h, str->Bytes(), str->Len());
+			}
+		else
+			{
+			ODesc d(DESC_BINARY);
+			v->Describe(&d);
+			sha1_update(&h, (const u_char *) d.Bytes(), d.Len());
+			}
+		}
+	sha1_final(&h, digest);
+	}
+
+static void hash_sha256_val(val_list& vlist, unsigned char digest[32])
+	{
+	SHA256_CTX h;
+
+	sha256_init(&h);
+	loop_over_list(vlist, i)
+		{
+		Val* v = vlist[i];
+		if ( v->Type()->Tag() == TYPE_STRING )
+			{
+			const BroString* str = v->AsString();
+			sha256_update(&h, str->Bytes(), str->Len());
+			}
+		else
+			{
+			ODesc d(DESC_BINARY);
+			v->Describe(&d);
+			sha256_update(&h, (const u_char *) d.Bytes(), d.Len());
+			}
+		}
+	sha256_final(&h, digest);
 	}
 %%}
 
@@ -565,6 +611,8 @@ static void hmac_md5_val(val_list& vlist, unsigned char digest[16])
 ## Returns: The MD5 hash value of the concatenated arguments.
 ##
 ## .. bro:see:: md5_hmac md5_hash_init md5_hash_update md5_hash_finish
+##    sha1_hash sha1_hash_init sha1_hash_update sha1_hash_finish
+##    sha256_hash sha256_hash_init sha256_hash_update sha256_hash_finish
 ##
 ## .. note::
 ##
@@ -578,6 +626,46 @@ function md5_hash%(...%): string
 	return new StringVal(md5_digest_print(digest));
 	%}
 
+## Computes the SHA1 hash value of the provided list of arguments.
+##
+## Returns: The SHA1 hash value of the concatenated arguments.
+##
+## .. bro:see:: md5_hash md5_hmac md5_hash_init md5_hash_update md5_hash_finish
+##    sha1_hash_init sha1_hash_update sha1_hash_finish
+##    sha256_hash sha256_hash_init sha256_hash_update sha256_hash_finish
+##
+## .. note::
+##
+##      This function performs a one-shot computation of its arguments.
+##      For incremental hash computation, see :bro:id:`sha1_hash_init` and
+##      friends.
+function sha1_hash%(...%): string
+	%{
+	unsigned char digest[20];
+	hash_sha1_val(@ARG@, digest);
+	return new StringVal(sha1_digest_print(digest));
+	%}
+
+## Computes the SHA256 hash value of the provided list of arguments.
+##
+## Returns: The SHA256 hash value of the concatenated arguments.
+##
+## .. bro:see:: md5_hash md5_hmac md5_hash_init md5_hash_update md5_hash_finish
+##    sha1_hash sha1_hash_init sha1_hash_update sha1_hash_finish
+##    sha256_hash_init sha256_hash_update sha256_hash_finish
+##
+## .. note::
+##
+##      This function performs a one-shot computation of its arguments.
+##      For incremental hash computation, see :bro:id:`sha256_hash_init` and
+##      friends.
+function sha256_hash%(...%): string
+	%{
+	unsigned char digest[32];
+	hash_sha256_val(@ARG@, digest);
+	return new StringVal(sha256_digest_print(digest));
+	%}
+
 ## Computes an HMAC-MD5 hash value of the provided list of arguments. The HMAC
 ## secret key is generated from available entropy when Bro starts up, or it can
 ## be specified for repeatability using the ``-K`` command line flag.
@@ -585,6 +673,8 @@ function md5_hash%(...%): string
 ## Returns: The HMAC-MD5 hash value of the concatenated arguments.
 ##
 ## .. bro:see:: md5_hash md5_hash_init md5_hash_update md5_hash_finish
+##    sha1_hash sha1_hash_init sha1_hash_update sha1_hash_finish
+##    sha256_hash sha256_hash_init sha256_hash_update sha256_hash_finish
 function md5_hmac%(...%): string
 	%{
 	unsigned char digest[16];
@@ -593,7 +683,9 @@ function md5_hmac%(...%): string
 	%}
 
 %%{
-static map<BroString, md5_state_s> md5_states;
+static map<BroString, MD5_CTX> md5_states;
+static map<BroString, SHA_CTX> sha1_states;
+static map<BroString, SHA256_CTX> sha256_states;
 
 BroString* convert_index_to_string(Val* index)
 	{
@@ -618,7 +710,9 @@ BroString* convert_index_to_string(Val* index)
 ##
 ## index: The unique identifier to associate with this hash computation.
 ##
-## .. bro:see:: md5_hash md5_hmac md5_hash_update md5_hash_finish
+## .. bro:see:: md5_hmac md5_hash md5_hash_update md5_hash_finish
+##    sha1_hash sha1_hash_init sha1_hash_update sha1_hash_finish
+##    sha256_hash sha256_hash_init sha256_hash_update sha256_hash_finish
 function md5_hash_init%(index: any%): bool
 	%{
 	BroString* s = convert_index_to_string(index);
@@ -626,9 +720,78 @@ function md5_hash_init%(index: any%): bool
 
 	if ( md5_states.count(*s) < 1 )
 		{
-		md5_state_s h;
+		MD5_CTX h;
 		md5_init(&h);
 		md5_states[*s] = h;
+		status = 1;
+		}
+
+	delete s;
+	return new Val(status, TYPE_BOOL);
+	%}
+
+## Initializes SHA1 state to enable incremental hash computation. After
+## initializing the SHA1 state with this function, you can feed data to
+## :bro:id:`sha1_hash_update` and finally need to call
+## :bro:id:`sha1_hash_finish` to finish the computation and get the final hash
+## value.
+##
+## For example, when computing incremental SHA1 values of transferred files in
+## multiple concurrent HTTP connections, one would call ``sha1_hash_init(c$id)``
+## once before invoking ``sha1_hash_update(c$id, some_more_data)`` in the
+## :bro:id:`http_entity_data` event handler. When all data has arrived, a call
+## to :bro:id:`sha1_hash_finish` returns the final hash value.
+##
+## index: The unique identifier to associate with this hash computation.
+##
+## .. bro:see:: md5_hmac md5_hash md5_hash_init md5_hash_update md5_hash_finish
+##    sha1_hash sha1_hash_update sha1_hash_finish
+##    sha256_hash sha256_hash_init sha256_hash_update sha256_hash_finish
+function sha1_hash_init%(index: any%): bool
+	%{
+	BroString* s = convert_index_to_string(index);
+	int status = 0;
+
+	if ( sha1_states.count(*s) < 1 )
+		{
+		SHA_CTX h;
+		sha1_init(&h);
+		sha1_states[*s] = h;
+		status = 1;
+		}
+
+	delete s;
+	return new Val(status, TYPE_BOOL);
+	%}
+
+## Initializes SHA256 state to enable incremental hash computation. After
+## initializing the SHA256 state with this function, you can feed data to
+## :bro:id:`sha256_hash_update` and finally need to call
+## :bro:id:`sha256_hash_finish` to finish the computation and get the final hash
+## value.
+##
+## For example, when computing incremental SHA256 values of transferred files in
+## multiple concurrent HTTP connections, one would call
+## ``sha256_hash_init(c$id)`` once before invoking
+## ``sha256_hash_update(c$id, some_more_data)`` in the
+## :bro:id:`http_entity_data` event handler. When all data has arrived, a call
+## to :bro:id:`sha256_hash_finish` returns the final hash value.
+##
+## index: The unique identifier to associate with this hash computation.
+##
+## .. bro:see:: md5_hmac md5_hash md5_hash_init md5_hash_update md5_hash_finish
+##    sha1_hash sha1_hash_init sha1_hash_update sha1_hash_finish
+##    sha256_hash sha256_hash_update sha256_hash_finish
+function sha256_hash_init%(index: any%): bool
+	%{
+	BroString* s = convert_index_to_string(index);
+	int status = 0;
+
+	if ( sha256_states.count(*s) < 1 )
+		{
+		SHA256_CTX h;
+		sha256_init(&h);
+		sha256_states[*s] = h;
 		status = 1;
 		}
 
@@ -644,7 +807,9 @@ function md5_hash_init%(index: any%): bool
 ##
 ## data: The data to add to the hash computation.
 ##
-## .. bro:see:: md5_hash md5_hmac md5_hash_init md5_hash_finish
+## .. bro:see:: md5_hmac md5_hash md5_hash_init md5_hash_finish
+##    sha1_hash sha1_hash_init sha1_hash_update sha1_hash_finish
+##    sha256_hash sha256_hash_init sha256_hash_update sha256_hash_finish
 function md5_hash_update%(index: any, data: string%): bool
 	%{
 	BroString* s = convert_index_to_string(index);
@@ -652,7 +817,59 @@ function md5_hash_update%(index: any, data: string%): bool
 
 	if ( md5_states.count(*s) > 0 )
 		{
-		md5_append(&md5_states[*s], data->Bytes(), data->Len());
+		md5_update(&md5_states[*s], data->Bytes(), data->Len());
+		status = 1;
+		}
+
+	delete s;
+	return new Val(status, TYPE_BOOL);
+	%}
+
+## Update the SHA1 value associated with a given index. It is required to
+## call :bro:id:`sha1_hash_init` once before calling this
+## function.
+##
+## index: The unique identifier to associate with this hash computation.
+##
+## data: The data to add to the hash computation.
+##
+## .. bro:see:: md5_hmac md5_hash md5_hash_init md5_hash_update md5_hash_finish
+##    sha1_hash sha1_hash_init sha1_hash_finish
+##    sha256_hash sha256_hash_init sha256_hash_update sha256_hash_finish
+function sha1_hash_update%(index: any, data: string%): bool
+	%{
+	BroString* s = convert_index_to_string(index);
+	int status = 0;
+
+	if ( sha1_states.count(*s) > 0 )
+		{
+		sha1_update(&sha1_states[*s], data->Bytes(), data->Len());
+		status = 1;
+		}
+
+	delete s;
+	return new Val(status, TYPE_BOOL);
+	%}
+
+## Update the SHA256 value associated with a given index. It is required to
+## call :bro:id:`sha256_hash_init` once before calling this
+## function.
+##
+## index: The unique identifier to associate with this hash computation.
+##
+## data: The data to add to the hash computation.
+##
+## .. bro:see:: md5_hmac md5_hash md5_hash_init md5_hash_update md5_hash_finish
+##    sha1_hash sha1_hash_init sha1_hash_update sha1_hash_finish
+##    sha256_hash sha256_hash_init sha256_hash_finish
+function sha256_hash_update%(index: any, data: string%): bool
+	%{
+	BroString* s = convert_index_to_string(index);
+	int status = 0;
+
+	if ( sha256_states.count(*s) > 0 )
+		{
+		sha256_update(&sha256_states[*s], data->Bytes(), data->Len());
 		status = 1;
 		}
 
@@ -666,7 +883,9 @@ function md5_hash_update%(index: any, data: string%): bool
 ##
 ## Returns: The hash value associated with the computation at *index*.
 ##
-## .. bro:see:: md5_hash md5_hmac md5_hash_init md5_hash_update
+## .. bro:see:: md5_hmac md5_hash md5_hash_init md5_hash_update
+##    sha1_hash sha1_hash_init sha1_hash_update sha1_hash_finish
+##    sha256_hash sha256_hash_init sha256_hash_update sha256_hash_finish
 function md5_hash_finish%(index: any%): string
 	%{
 	BroString* s = convert_index_to_string(index);
@@ -675,9 +894,65 @@ function md5_hash_finish%(index: any%): string
 	if ( md5_states.count(*s) > 0 )
 		{
 		unsigned char digest[16];
-		md5_finish(&md5_states[*s], digest);
+		md5_final(&md5_states[*s], digest);
 		md5_states.erase(*s);
 		printable_digest = new StringVal(md5_digest_print(digest));
+		}
+	else
+		printable_digest = new StringVal("");
+
+	delete s;
+	return printable_digest;
+	%}
+
+## Returns the final SHA1 digest of an incremental hash computation.
+##
+## index: The unique identifier of this hash computation.
+##
+## Returns: The hash value associated with the computation at *index*.
+##
+## .. bro:see:: md5_hmac md5_hash md5_hash_init md5_hash_update md5_hash_finish
+##    sha1_hash sha1_hash_init sha1_hash_update
+##    sha256_hash sha256_hash_init sha256_hash_update sha256_hash_finish
+function sha1_hash_finish%(index: any%): string
+	%{
+	BroString* s = convert_index_to_string(index);
+	StringVal* printable_digest;
+
+	if ( sha1_states.count(*s) > 0 )
+		{
+		unsigned char digest[20];
+		sha1_final(&sha1_states[*s], digest);
+		sha1_states.erase(*s);
+		printable_digest = new StringVal(sha1_digest_print(digest));
+		}
+	else
+		printable_digest = new StringVal("");
+
+	delete s;
+	return printable_digest;
+	%}
+
+## Returns the final SHA256 digest of an incremental hash computation.
+##
+## index: The unique identifier of this hash computation.
+##
+## Returns: The hash value associated with the computation at *index*.
+##
+## .. bro:see:: md5_hmac md5_hash md5_hash_init md5_hash_update md5_hash_finish
+##    sha1_hash sha1_hash_init sha1_hash_update sha1_hash_finish
+##    sha256_hash sha256_hash_init sha256_hash_update
+function sha256_hash_finish%(index: any%): string
+	%{
+	BroString* s = convert_index_to_string(index);
+	StringVal* printable_digest;
+
+	if ( sha256_states.count(*s) > 0 )
+		{
+		unsigned char digest[32];
+		sha256_final(&sha256_states[*s], digest);
+		sha256_states.erase(*s);
+		printable_digest = new StringVal(sha256_digest_print(digest));
 		}
 	else
 		printable_digest = new StringVal("");
@@ -1949,7 +2224,7 @@ function is_local_interface%(ip: addr%) : bool
 	if ( ent )
 		{
 		for ( unsigned int len = 0; ent->h_addr_list[len]; ++len )
-			addrs.push_back(IPAddr(IPAddr::IPv4, (uint32*)ent->h_addr_list[len],
+			addrs.push_back(IPAddr(IPv4, (uint32*)ent->h_addr_list[len],
 			                       IPAddr::Network));
 		}
 
@@ -1958,7 +2233,7 @@ function is_local_interface%(ip: addr%) : bool
 	if ( ent )
 		{
 		for ( unsigned int len = 0; ent->h_addr_list[len]; ++len )
-			addrs.push_back(IPAddr(IPAddr::IPv6, (uint32*)ent->h_addr_list[len],
+			addrs.push_back(IPAddr(IPv6, (uint32*)ent->h_addr_list[len],
 			                       IPAddr::Network));
 		}
 
@@ -2024,7 +2299,7 @@ function gethostname%(%) : string
 ## Returns: true if *a* is an IPv4 address, else false.
 function is_v4_addr%(a: addr%): bool
 	%{
-	if ( a->AsAddr().GetFamily() == IPAddr::IPv4 )
+	if ( a->AsAddr().GetFamily() == IPv4 )
 		return new Val(1, TYPE_BOOL);
 	else
 		return new Val(0, TYPE_BOOL);
@@ -2037,7 +2312,7 @@ function is_v4_addr%(a: addr%): bool
 ## Returns: true if *a* is an IPv6 address, else false.
 function is_v6_addr%(a: addr%): bool
 	%{
-	if ( a->AsAddr().GetFamily() == IPAddr::IPv6 )
+	if ( a->AsAddr().GetFamily() == IPv6 )
 		return new Val(1, TYPE_BOOL);
 	else
 		return new Val(0, TYPE_BOOL);
@@ -2070,7 +2345,7 @@ function routing0_data_to_addrs%(s: string%): addr_vec
 
 	while ( len > 0 )
 		{
-		IPAddr a(IPAddr::IPv6, (const uint32*) bytes, IPAddr::Network);
+		IPAddr a(IPv6, (const uint32*) bytes, IPAddr::Network);
 		rval->Assign(rval->Size(), new AddrVal(a), 0);
 		bytes += 16;
 		len -= 16;
@@ -3552,7 +3827,7 @@ function lookup_location%(a: addr%) : geo_location
 		}
 
 #ifdef HAVE_GEOIP_COUNTRY_EDITION_V6
-	if ( geoip_v6 && a->AsAddr().GetFamily() == IPAddr::IPv6 )
+	if ( geoip_v6 && a->AsAddr().GetFamily() == IPv6 )
 		{
 		geoipv6_t ga;
 		a->AsAddr().CopyIPv6(&ga);
@@ -3564,7 +3839,7 @@ function lookup_location%(a: addr%) : geo_location
 	else
 #endif
 
-	if ( geoip && a->AsAddr().GetFamily() == IPAddr::IPv4 )
+	if ( geoip && a->AsAddr().GetFamily() == IPv4 )
 		{
 		const uint32* bytes;
 		a->AsAddr().GetBytes(&bytes);
@@ -3647,7 +3922,7 @@ function lookup_asn%(a: addr%) : count
 		{
 // IPv6 support showed up in 1.4.5.
 #ifdef HAVE_GEOIP_COUNTRY_EDITION_V6
-		if ( a->AsAddr().GetFamily() == IPAddr::IPv6 )
+		if ( a->AsAddr().GetFamily() == IPv6 )
 			{
 			geoipv6_t ga;
 			a->AsAddr().CopyIPv6(&ga);
@@ -3656,7 +3931,7 @@ function lookup_asn%(a: addr%) : count
 		else
 #endif
 
-		if ( a->AsAddr().GetFamily() == IPAddr::IPv4 )
+		if ( a->AsAddr().GetFamily() == IPv4 )
 			{
 			const uint32* bytes;
 			a->AsAddr().GetBytes(&bytes);
@@ -4693,6 +4968,8 @@ function pcap_error%(%): string
 
 ## Installs a filter to drop packets from a given IP source address with
 ## a certain probability if none of a given set of TCP flags are set.
+## Note that for IPv6 packets with a Destination options header that has
+## the Home Address option, this filters out against that home address.
 ##
 ## ip: The IP address to drop.
 ##
@@ -4795,6 +5072,9 @@ function uninstall_src_net_filter%(snet: subnet%) : bool
 
 ## Installs a filter to drop packets destined to a given IP address with
 ## a certain probability if none of a given set of TCP flags are set.
+## Note that for IPv6 packets with a routing type header and non-zero
+## segments left, this filters out against the final destination of the
+## packet according to the routing extension header.
 ##
 ## ip: Drop packets to this IP address.
 ##
@@ -5383,7 +5663,7 @@ function preserve_prefix%(a: addr, width: count%): any
 	AnonymizeIPAddr* ip_anon = ip_anonymizer[PREFIX_PRESERVING_A50];
 	if ( ip_anon )
 		{
-		if ( a->AsAddr().GetFamily() == IPAddr::IPv6 )
+		if ( a->AsAddr().GetFamily() == IPv6 )
 			builtin_error("preserve_prefix() not supported for IPv6 addresses");
 		else
 			{
@@ -5412,7 +5692,7 @@ function preserve_subnet%(a: subnet%): any
 	AnonymizeIPAddr* ip_anon = ip_anonymizer[PREFIX_PRESERVING_A50];
 	if ( ip_anon )
 		{
-		if ( a->AsSubNet().Prefix().GetFamily() == IPAddr::IPv6 )
+		if ( a->AsSubNet().Prefix().GetFamily() == IPv6 )
 			builtin_error("preserve_subnet() not supported for IPv6 addresses");
 		else
 			{
@@ -5448,7 +5728,7 @@ function anonymize_addr%(a: addr, cl: IPAddrAnonymizationClass%): addr
 	if ( anon_class < 0 || anon_class >= NUM_ADDR_ANONYMIZATION_CLASSES )
 		builtin_error("anonymize_addr(): invalid ip addr anonymization class");
 
-	if ( a->AsAddr().GetFamily() == IPAddr::IPv6 )
+	if ( a->AsAddr().GetFamily() == IPv6 )
 		{
 		builtin_error("anonymize_addr() not supported for IPv6 addresses");
 		return 0;

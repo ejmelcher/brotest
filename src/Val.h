@@ -509,13 +509,9 @@ protected:
 #define NUM_PORT_SPACES 4
 #define PORT_SPACE_MASK 0x30000
 
-#define TCP_PORT_MASK  0x10000
-#define UDP_PORT_MASK  0x20000
-#define ICMP_PORT_MASK 0x30000
-
-typedef enum {
-	TRANSPORT_UNKNOWN, TRANSPORT_TCP, TRANSPORT_UDP, TRANSPORT_ICMP,
-} TransportProto;
+#define TCP_PORT_MASK	0x10000
+#define UDP_PORT_MASK	0x20000
+#define ICMP_PORT_MASK	0x30000
 
 class PortVal : public Val {
 public:
@@ -588,8 +584,8 @@ public:
 
 	Val* SizeVal() const;
 
-	const IPAddr& Prefix() const { return val.subnet_val->Prefix(); }
-	int Width() const	{ return val.subnet_val->Length(); }
+	const IPAddr& Prefix() const;
+	int Width() const;
 	IPAddr Mask() const;
 
 	bool Contains(const IPAddr& addr) const;

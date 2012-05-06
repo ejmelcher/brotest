@@ -272,6 +272,7 @@ void NetSessions::NextPacket(double t, const struct pcap_pkthdr* hdr,
 			}
 
 		const struct ip* ip = (const struct ip*) (pkt + hdr_size);
+
 		if ( ip->ip_v == 4 )
 			{
 			IP_Hdr ip_hdr(ip, false);
@@ -280,7 +281,13 @@ void NetSessions::NextPacket(double t, const struct pcap_pkthdr* hdr,
 
 		else if ( ip->ip_v == 6 )
 			{
-			IP_Hdr ip_hdr((const struct ip6_hdr*) (pkt + hdr_size), false);
+			if ( caplen < sizeof(struct ip6_hdr) )
+				{
+				Weird("truncated_IP", hdr, pkt);
+				return;
+				}
+
+			IP_Hdr ip_hdr((const struct ip6_hdr*) (pkt + hdr_size), false, caplen);
 			DoNextPacket(t, hdr, &ip_hdr, pkt, hdr_size);
 			}
 
@@ -481,21 +488,34 @@ void NetSessions::DoNextPacket(double t, const struct pcap_pkthdr* hdr,
 		return;
 		}
 
-	// Stop analyzing IPv6 packets that use routing type 0 headers with segments
-	// left since RH0 headers are deprecated by RFC 5095 and we'd have to make
-	// extra effort to get the destination in the connection/flow endpoint right.
-	if ( ip_hdr->RH0SegLeft() )
+#ifdef ENABLE_MOBILE_IPV6
+	// We stop building the chain when seeing IPPROTO_MOBILITY so it's always
+	// last if present.
+	if ( ip_hdr->LastHeader() == IPPROTO_MOBILITY )
 		{
 		dump_this_packet = 1;
-		if ( rh0_segleft )
+
+		if ( ! ignore_checksums && mobility_header_checksum(ip_hdr) != 0xffff )
+			{
+			Weird("bad_MH_checksum", hdr, pkt);
+			Remove(f);
+			return;
+			}
+
+		if ( mobile_ipv6_message )
 			{
 			val_list* vl = new val_list();
 			vl->append(ip_hdr->BuildPktHdrVal());
-			mgr.QueueEvent(rh0_segleft, vl);
+			mgr.QueueEvent(mobile_ipv6_message, vl);
 			}
+
+		if ( ip_hdr->NextProto() != IPPROTO_NONE )
+			Weird("mobility_piggyback", hdr, pkt);
+
 		Remove(f);
 		return;
 		}
+#endif
 
 	int proto = ip_hdr->NextProto();
 
@@ -538,7 +558,23 @@ void NetSessions::DoNextPacket(double t, const struct pcap_pkthdr* hdr,
 		const struct icmp* icmpp = (const struct icmp *) data;
 
 		id.src_port = icmpp->icmp_type;
-		id.dst_port = ICMP_counterpart(icmpp->icmp_type,
+		id.dst_port = ICMP4_counterpart(icmpp->icmp_type,
+						icmpp->icmp_code,
+						id.is_one_way);
+
+		id.src_port = htons(id.src_port);
+		id.dst_port = htons(id.dst_port);
+
+		d = &icmp_conns;
+		break;
+		}
+
+	case IPPROTO_ICMPV6:
+		{
+		const struct icmp* icmpp = (const struct icmp *) data;
+
+		id.src_port = icmpp->icmp_type;
+		id.dst_port = ICMP6_counterpart(icmpp->icmp_type,
 						icmpp->icmp_code,
 						id.is_one_way);
 
@@ -656,6 +692,7 @@ bool NetSessions::CheckHeaderTrunc(int proto, uint32 len, uint32 caplen,
 		min_hdr_len = sizeof(struct udphdr);
 		break;
 	case IPPROTO_ICMP:
+	case IPPROTO_ICMPV6:
 	default:
 		// Use for all other packets.
 		min_hdr_len = ICMP_MINLEN;
@@ -984,6 +1021,9 @@ Connection* NetSessions::NewConn(HashKey* k, double t, const ConnID* id,
 			break;
 		case IPPROTO_UDP:
 			tproto = TRANSPORT_UDP;
+			break;
+		case IPPROTO_ICMPV6:
+			tproto = TRANSPORT_ICMP;
 			break;
 		default:
 			reporter->InternalError("unknown transport protocol");

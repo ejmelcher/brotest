@@ -92,6 +92,8 @@ type icmp_conn: record {
 	itype: count;	##< The ICMP type of the packet that triggered the instantiation of the record.
 	icode: count;	##< The ICMP code of the packet that triggered the instantiation of the record.
 	len: count;	##< The length of the ICMP payload of the packet that triggered the instantiation of the record.
+	hlim: count;	##< The encapsulating IP header's Hop Limit value.
+	v6: bool;	##< True if it's an ICMPv6 packet.
 };
 
 ## Packet context part of an ICMP message. The fields of this record reflect the
@@ -100,11 +102,13 @@ type icmp_conn: record {
 ## .. bro:see:: icmp_time_exceeded icmp_unreachable
 type icmp_context: record {
 	id: conn_id;	##< The packet's 4-tuple.
-	len: count;	##< The lenght of the packet's IP header.
+	len: count;	##< The length of the IP packet (headers + payload).
 	proto: count;	##< The packet's transport-layer protocol.
 	frag_offset: count;	##< The packet's fragementation offset.
-	## True if the packet's IP header is fully included in the context. If that is not
-	## the case, the other fields will all be set to null values.
+	## True if the packet's IP header is not fully included in the context
+	## or if there is not enough of the transport header to determine source
+	## and destination ports. If that is the cast, the appropriate fields
+	## of this record will be set to null values.
 	bad_hdr_len: bool;
 	bad_checksum: bool;	##< True if the packet's IP checksum is not correct.
 	MF: bool;	##< True if the packets *more fragements* flag is set.
@@ -947,6 +951,7 @@ const IPPROTO_IPIP = 4;			##< IP encapsulation in IP.
 const IPPROTO_TCP = 6;			##< TCP.
 const IPPROTO_UDP = 17;			##< User datagram protocol.
 const IPPROTO_IPV6 = 41;		##< IPv6 header.
+const IPPROTO_ICMPV6 = 58;		##< ICMP for IPv6.
 const IPPROTO_RAW = 255;		##< Raw IP packet.
 
 # Definitions for IPv6 extension headers.
@@ -957,6 +962,7 @@ const IPPROTO_ESP = 50;			##< IPv6 encapsulating security payload header.
 const IPPROTO_AH = 51;			##< IPv6 authentication header.
 const IPPROTO_NONE = 59;		##< IPv6 no next header.
 const IPPROTO_DSTOPTS = 60;		##< IPv6 destination options header.
+const IPPROTO_MOBILITY = 135;		##< IPv6 mobility header.
 
 ## Values extracted from an IPv6 extension header's (e.g. hop-by-hop or
 ## destination option headers) option field.
@@ -1059,6 +1065,159 @@ type ip6_esp: record {
 	seq: count;
 };
 
+## Values extracted from an IPv6 Mobility Binding Refresh Request message.
+##
+## .. bro:see:: ip6_mobility_hdr ip6_hdr ip6_hdr_chain ip6_mobility_msg
+type ip6_mobility_brr: record {
+	## Reserved.
+	rsv: count;
+	## Mobility Options.
+	options: vector of ip6_option;
+};
+
+## Values extracted from an IPv6 Mobility Home Test Init message.
+##
+## .. bro:see:: ip6_mobility_hdr ip6_hdr ip6_hdr_chain ip6_mobility_msg
+type ip6_mobility_hoti: record {
+	## Reserved.
+	rsv: count;
+	## Home Init Cookie.
+	cookie: count;
+	## Mobility Options.
+	options: vector of ip6_option;
+};
+
+## Values extracted from an IPv6 Mobility Care-of Test Init message.
+##
+## .. bro:see:: ip6_mobility_hdr ip6_hdr ip6_hdr_chain ip6_mobility_msg
+type ip6_mobility_coti: record {
+	## Reserved.
+	rsv: count;
+	## Care-of Init Cookie.
+	cookie: count;
+	## Mobility Options.
+	options: vector of ip6_option;
+};
+
+## Values extracted from an IPv6 Mobility Home Test message.
+##
+## .. bro:see:: ip6_mobility_hdr ip6_hdr ip6_hdr_chain ip6_mobility_msg
+type ip6_mobility_hot: record {
+	## Home Nonce Index.
+	nonce_idx: count;
+	## Home Init Cookie.
+	cookie: count;
+	## Home Keygen Token.
+	token: count;
+	## Mobility Options.
+	options: vector of ip6_option;
+};
+
+## Values extracted from an IPv6 Mobility Care-of Test message.
+##
+## .. bro:see:: ip6_mobility_hdr ip6_hdr ip6_hdr_chain ip6_mobility_msg
+type ip6_mobility_cot: record {
+	## Care-of Nonce Index.
+	nonce_idx: count;
+	## Care-of Init Cookie.
+	cookie: count;
+	## Care-of Keygen Token.
+	token: count;
+	## Mobility Options.
+	options: vector of ip6_option;
+};
+
+## Values extracted from an IPv6 Mobility Binding Update message.
+##
+## .. bro:see:: ip6_mobility_hdr ip6_hdr ip6_hdr_chain ip6_mobility_msg
+type ip6_mobility_bu: record {
+	## Sequence number.
+	seq: count;
+	## Acknowledge bit.
+	a: bool;
+	## Home Registration bit.
+	h: bool;
+	## Link-Local Address Compatibility bit.
+	l: bool;
+	## Key Management Mobility Capability bit.
+	k: bool;
+	## Lifetime.
+	life: count;
+	## Mobility Options.
+	options: vector of ip6_option;
+};
+
+## Values extracted from an IPv6 Mobility Binding Acknowledgement message.
+##
+## .. bro:see:: ip6_mobility_hdr ip6_hdr ip6_hdr_chain ip6_mobility_msg
+type ip6_mobility_back: record {
+	## Status.
+	status: count;
+	## Key Management Mobility Capability.
+	k: bool;
+	## Sequence number.
+	seq: count;
+	## Lifetime.
+	life: count;
+	## Mobility Options.
+	options: vector of ip6_option;
+};
+
+## Values extracted from an IPv6 Mobility Binding Error message.
+##
+## .. bro:see:: ip6_mobility_hdr ip6_hdr ip6_hdr_chain ip6_mobility_msg
+type ip6_mobility_be: record {
+	## Status.
+	status: count;
+	## Home Address.
+	hoa: addr;
+	## Mobility Options.
+	options: vector of ip6_option;
+};
+
+## Values extracted from an IPv6 Mobility header's message data.
+##
+## .. bro:see:: ip6_mobility_hdr ip6_hdr ip6_hdr_chain
+type ip6_mobility_msg: record {
+	## The type of message from the header's MH Type field.
+	id: count;
+	## Binding Refresh Request.
+	brr: ip6_mobility_brr &optional;
+	## Home Test Init.
+	hoti: ip6_mobility_hoti &optional;
+	## Care-of Test Init.
+	coti: ip6_mobility_coti &optional;
+	## Home Test.
+	hot: ip6_mobility_hot &optional;
+	## Care-of Test.
+	cot: ip6_mobility_cot &optional;
+	## Binding Update.
+	bu: ip6_mobility_bu &optional;
+	## Binding Acknowledgement.
+	back: ip6_mobility_back &optional;
+	## Binding Error.
+	be: ip6_mobility_be &optional;
+};
+
+## Values extracted from an IPv6 Mobility header.
+##
+## .. bro:see:: pkt_hdr ip4_hdr ip6_hdr ip6_hdr_chain
+type ip6_mobility_hdr: record {
+	## Protocol number of the next header (RFC 1700 et seq., IANA assigned
+	## number), e.g. :bro:id:`IPPROTO_ICMP`.
+	nxt: count;
+	## Length of header in 8-octet units, excluding first unit.
+	len: count;
+	## Mobility header type used to identify header's the message.
+	mh_type: count;
+	## Reserved field.
+	rsv: count;
+	## Mobility header checksum.
+	chksum: count;
+	## Mobility header message
+	msg: ip6_mobility_msg;
+};
+
 ## A general container for a more specific IPv6 extension header.
 ##
 ## .. bro:see:: pkt_hdr ip4_hdr ip6_hopopts ip6_dstopts ip6_routing ip6_fragment
@@ -1079,6 +1238,8 @@ type ip6_ext_hdr: record {
 	ah: ip6_ah &optional;
 	## Encapsulating security payload header.
 	esp: ip6_esp &optional;
+	## Mobility header.
+	mobility: ip6_mobility_hdr &optional;
 };
 
 ## Values extracted from an IPv6 header.
@@ -2167,6 +2328,11 @@ type bt_tracker_headers: table[string] of string;
 
 ## BPF filter the user has set via the -f command line options. Empty if none.
 const cmd_line_bpf_filter = "" &redef;
+
+## The maximum number of open files to keep cached at a given time.
+## If set to zero, this is automatically determined by inspecting
+## the current/maximum limit on open files for the process.
+const max_files_in_cache = 0 &redef;
 
 ## Deprecated.
 const log_rotate_interval = 0 sec &redef;
