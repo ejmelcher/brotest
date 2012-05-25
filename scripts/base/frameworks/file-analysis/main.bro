@@ -36,7 +36,7 @@ export {
 	## be buffered by default.
 	const default_buffer_beginning_bytes = 0 &redef;
 	const default_buffer_reassembly_size = 1024*1024 &redef; # 1meg reassembly buffer!
-	const min_chunk_size = 1000;
+	#const min_chunk_size = 1000;
 	
 	## No plugins can take longer than this to return if they
 	## want to include data into the file analysis log.
@@ -93,7 +93,9 @@ export {
 		
 		reassembly_buffer_overflow: bool &default=F;
 		reassembled_data: bool &default=F;
-		possible_reassembly: bool &default=F;
+		waiting_for_offset: count &default=0;
+		first_usable_buffer: DataBuffer &optional;
+		done: bool &default=F;
 	};
 	
 	type PolicyItem: record {
@@ -106,7 +108,10 @@ export {
 		pred:      function(rec: Info): bool &optional;
 		
 		## Action to take with the file.
-		action:    Action;
+		action:    Action &optional;
+		
+		## Use this if multiple actions are to be applied with a single PolicyItem.
+		actions:   set[Action] &optional;
 		
 		## Indicate a maximum number of bytes to buffer for reassembly
 		buffer_bytes: count &optional;
@@ -151,6 +156,13 @@ export {
 	global linear_data_done: event(f: Info);
 }
 
+## This data structure is for tracking files that are transferred over protocols
+## that use raw TCP sockets to transfer files and one TCP connection equates to 
+## one file.
+redef record connection += {
+	file_analyzer_info: Info &optional;
+};
+
 event bro_init() &priority=5
 	{
 	Log::create_stream(FileAnalysis::LOG, [$columns=Info]);
@@ -158,7 +170,13 @@ event bro_init() &priority=5
 
 # A variable for tracking all of the active files.
 # It's indexed by the "id" used for the file so that it should remain globally unique.
-global tracker: table[string] of Info = table() &read_expire=10min &redef;
+global tracker: table[string] of Info = {} &read_expire=2mins &redef 
+	&expire_func = function(the_table: table[string] of Info, index: any): interval
+		{
+		#print "expiring a file!";
+		#print the_table[index];
+		return 0secs;
+		};
 
 function get_file(id: string): Info
 	{
@@ -210,34 +228,43 @@ function reassemble_buffers(f: Info)
 	# Deal with a full reassembly buffer
 	if ( f?$buffer )
 		{
+		delete f$first_usable_buffer;
 		local buffered_bytes = 0;
 		sort(f$buffer, chunk_sorter);
 		local new_buffer: vector of DataBuffer = vector();
-		local forwarded_last_buffer = T;
+		local retained_last_buffer = F;
 		
+		#print "BEGIN REASSEMBLY!";
 		for ( i in f$buffer )
 			{
 			local chunk = f$buffer[i];
-			#print fmt("in reassembly: %s -- linear data offset: %d -- chunk offset:%d -- chunk len:%d", f$cids, f$linear_data_offset, chunk$offset, chunk$len);
+			#print fmt("chunk in reassembly: linear data offset: %d -- chunk offset:%d -- chunk len:%d", f$linear_data_offset, chunk$offset, chunk$len);
 			
 			if ( f$linear_data_offset > chunk$offset + chunk$len )
 				{
+				#print "    throwing out a duplicate chunk";
+				#print f$linear_data_offset;
+				#print chunk$offset;
+				#print chunk$len;
 				# Throw out this buffer if linear data has already bypassed it
 				# It's essentially redundant data at this point.
 				f$buffered_bytes -= chunk$len;
 				next;
 				}
 			
-			if ( ! forwarded_last_buffer && 
-			     new_buffer[|new_buffer|-1]$offset+new_buffer[|new_buffer|-1]$len >= chunk$offset )
+			if ( retained_last_buffer && 
+			     new_buffer[|new_buffer|-1]$offset + new_buffer[|new_buffer|-1]$len >= chunk$offset )
 				{
+				#print "    combining chunks!";
 				local combined_chunk_len = chunk$len + new_buffer[|new_buffer|-1]$len;
 				chunk = combine_buffers(new_buffer[|new_buffer|-1], chunk);
 				# Adjust the buffered bytes for any snipped/overlapping bytes.
-				#f$buffered_bytes -= combined_chunk_len - chunk$len;
+				f$buffered_bytes -= combined_chunk_len - chunk$len;
 				}
 			
-			if ( min_chunk_size <= chunk$len && chunk$offset == f$linear_data_offset )
+			#print fmt("    chunk offset:%d size:%d", chunk$offset, chunk$len);
+			if ( chunk$offset <= f$linear_data_offset ||
+			     f$linear_data_offset + chunk$len == f$size )
 				{
 				# Pull back on total buffered counter.
 				if ( f$buffered_bytes > 0 )
@@ -250,60 +277,82 @@ function reassemble_buffers(f: Info)
 				# I avoid this for now by creating a new buffer of unused 
 				# DataBuffers.
 				#delete f$buffer[i]; <- Ack!  We need to be able to delete arbitrary elements!
-				forwarded_last_buffer = T;
+				retained_last_buffer = F;
 				}
 			else
 				{
-				if ( ! forwarded_last_buffer )
+				#print "    retain buffer";
+				if ( chunk$offset == f$linear_data_offset )
+					f$waiting_for_offset = chunk$offset+chunk$len;
+				
+				if ( retained_last_buffer )
 					new_buffer[|new_buffer|-1] = chunk;
 				else
 					new_buffer[|new_buffer|] = chunk;
 				
-				buffered_bytes += chunk$len;
-				forwarded_last_buffer = F;
+				if ( ! f?$first_usable_buffer || f$first_usable_buffer$offset > chunk$offset )
+					f$first_usable_buffer = chunk;
+				
+				retained_last_buffer = F;
 				}
 			}
 		f$buffer = new_buffer;
-		f$buffered_bytes = buffered_bytes;
-		f$possible_reassembly = F;
 		}
 	}
 
 event FileAnalysis::file_done(f: Info) &priority=5
 	{
+	# Delete the file from the tracker right away since the record
+	# will be maintained by direct value references from here on out.
+	delete tracker[f$fid];
+	
 	if ( ! f?$first_done_ts )
 		f$first_done_ts = network_time();
 	
 	if ( |f$delay_tickets| == 0 || f$first_done_ts+max_logging_delay < network_time() )
-		{
 		Log::write(LOG, f);
-		delete tracker[f$fid];
-		}
 	else
-		{
 		schedule 1sec { FileAnalysis::file_done(f) };
-		}
 	}
 
 function send_data(f: Info, protocol: string, offset: count, data: string)
 	{
 	f$protocol = protocol;
+	#print fmt("RECEIVING: offset:%d length:%d", offset, |data|);
 	
-	#print fmt("linear offset: %d - offset: %d - data len: %d", f$linear_data_offset, offset, |data|);
-	if ( (min_chunk_size <= |data| && offset <= f$linear_data_offset) || 
-		 (f?$size && f$size == f$linear_data_offset+|data|) )
+	#if ( f$done )
+	#	{
+	#	print "extra data received?";
+	#	return;
+	#	}
+	
+	local local_data = data;
+	# If the data overlaps with data already sent through linear_data, trim it.
+	if ( offset < f$linear_data_offset && f$linear_data_offset < offset+|data| )
 		{
-		local local_data = data;
-		# If the data overlaps with data already sent through linear_data, trim it.
-		if ( offset < f$linear_data_offset )
-			local_data = sub_bytes(local_data, f$linear_data_offset - offset, |local_data|+offset-f$linear_data_offset);
-		
+		#print f$linear_data_offset;
+		#print offset;
+		#print |local_data|;
+		#print fmt("    snipped From: %d To: %d", f$linear_data_offset - offset + 1, |local_data|);
+		local_data = sub_bytes(local_data, f$linear_data_offset - offset + 1, |local_data|);
+		offset += |data| - |local_data|;
+		}
+	else if ( offset < f$linear_data_offset && offset+|data| < f$linear_data_offset )
+		{
+		#print "    throwing out data since it has been bypassed";
+		return;
+		}
+	
+	#print fmt("    linear offset: %d - offset: %d - data len: %d", f$linear_data_offset, offset, |local_data|);
+	if ( offset <= f$linear_data_offset || 
+		 (f?$size && f$size == f$linear_data_offset+|local_data|) )
+		{
 		if ( f$linear_data_offset == 0 )
 			event FileAnalysis::trigger(f, IDENTIFIED_BOF);
 			
 		if ( ! f?$mime_type )
 			{
-			f$mime_type = split1(identify_data(data, T), /;/)[1];
+			f$mime_type = split1(identify_data(local_data, T), /;/)[1];
 			event FileAnalysis::trigger(f, IDENTIFIED_MIME);
 			}
 		
@@ -312,28 +361,39 @@ function send_data(f: Info, protocol: string, offset: count, data: string)
 
 		# Send the data to the linear_data event.
 		event FileAnalysis::linear_data(f, local_data);
-
+		
 		# If the linear data offset has reached the full file size
 		# we should send the event to indicate the end of linear data.
+		#print fmt("    LINEAR OFFSET IS NOW %d AND FILE SIZE IS %d", f$linear_data_offset, f$size);
 		if ( ! f?$first_done_ts && 
 		     f?$size && f$linear_data_offset == f$size )
 			{
+			#f$done = T;
 			event FileAnalysis::linear_data_done(f);
 			}
+		else if ( f?$first_usable_buffer )
+			{
+			reassemble_buffers(f);
+			return;
+			}
+		
 		}
 	else if ( ! f$reassembled_data )
 		{
 		if ( ! f?$buffer )
 			f$buffer = vector();
 		
-		f$buffer[|f$buffer|] = [$offset=offset, $data=data, $len=|data|];
-		f$buffered_bytes += |data|;
-
-		if ( offset <= f$linear_data_offset && offset+|data| >= f$linear_data_offset )
-			f$possible_reassembly = T;
-
-		#print fmt("buffered bytes: %d buffered elements: %d", f$buffered_bytes, |f$buffer|);
-		if ( f$buffered_bytes > min_chunk_size && f$possible_reassembly )
+		local chunk: DataBuffer = [$offset=offset, $data=local_data, $len=|data|];
+		f$buffer[|f$buffer|] = chunk;
+		f$buffered_bytes += |local_data|;
+		
+		if ( ! f?$first_usable_buffer ||
+		     f$first_usable_buffer$offset > chunk$offset )
+			f$first_usable_buffer = chunk;
+		
+		#print fmt("    buffered bytes: %d buffered elements: %d", f$buffered_bytes, |f$buffer|);
+		if ( f$first_usable_buffer$offset <= f$linear_data_offset ||
+			 f$waiting_for_offset == offset )
 			reassemble_buffers(f);
 		return;
 		}
@@ -341,7 +401,6 @@ function send_data(f: Info, protocol: string, offset: count, data: string)
 	if ( f$buffered_bytes > f$buffered_reassembly_bytes )
 		{
 		f$reassembly_buffer_overflow = T;
-		#print "reassembly overflow";
 		event FileAnalysis::file_done(f);
 		}
 	}
@@ -351,6 +410,7 @@ function send_EOD(f: Info)
 	reassemble_buffers(f);
 
 	event FileAnalysis::trigger(f, IDENTIFIED_EOD);
+	f$done = T;
 	if ( ! f?$first_done_ts )
 		event FileAnalysis::linear_data_done(f);
 	}
@@ -376,27 +436,39 @@ event FileAnalysis::trigger(f: Info, trig: Trigger) &priority=5
 		if ( pi$trigger == trig && 
 			 ( ! pi?$pred || pi$pred(f) ) )
 			{
-			add f$actions[pi$action];
+			local actions: set[Action];
 			
-			if ( pi$action in action_dependencies )
+			if ( pi?$action )
+				actions = set(pi$action);
+			else if ( pi?$actions )
+				actions = pi$actions;
+			
+			for ( action in actions )
 				{
-				for ( dep_action in action_dependencies[pi$action] )
+				add f$actions[action];
+				
+				if ( action in action_dependencies )
 					{
-					add f$actions[dep_action];
-					# Make it stop!!!  This deals with dependencies of dependencies. :(
-					for ( dep_dep_action in action_dependencies[pi$action][dep_action] )
-						add f$actions[dep_dep_action];
+					for ( dep_action in action_dependencies[action] )
+						{
+						add f$actions[dep_action];
+						# Make it stop!!!  This deals with dependencies of dependencies. :(
+						for ( dep_dep_action in action_dependencies[action] )
+							add f$actions[dep_dep_action];
+						}
 					}
 				}
 			}
 		}
 	}
 
+@load ./plugins/hash
 event FileAnalysis::linear_data_done(f: Info) &priority=-10
 	{
 	# The file must have at least one connection and some size 
 	# associated with it before we are willing to log it.
-	if ( f?$size && f$size > 0 && |f$uids| > 0 )
+	if ( (f$done || (f?$size && f$size > 0)) &&
+		 |f$uids| > 0 )
 		{
 		f$size = f$linear_data_offset;
 		event FileAnalysis::file_done(f);

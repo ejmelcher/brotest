@@ -10,19 +10,28 @@ export {
 	redef enum Trigger  += { BEGINNING_BUFFERED };
 	
 	redef record Info += {
-		## The number of bytes of the beginning of a file that should
-		## be buffered for inspection.
-		buffer_beginning_bytes: count &optional;
+		## The minimum number of bytes of the beginning of a file 
+		## that should be buffered for inspection.
+		buffer_beginning_bytes: count &default=0;
 		
-		## The bytes of this 
+		## The bytes of this file that are buffered.
 		buffer_beginning:    string  &optional;
 	};
 }
 
 event FileAnalysis::linear_data(f: Info, data: string) &priority=5
 	{
-	if ( ACTION_BUFFER_BEGINNING in f$actions )
+	if ( ACTION_BUFFER_BEGINNING in f$actions && 
+	     (! f?$buffer_beginning || |f$buffer_beginning| < f$buffer_beginning_bytes))
 		{
-		if ( )
+		if ( ! f?$buffer_beginning )
+			f$buffer_beginning = data;
+		else
+			f$buffer_beginning = f$buffer_beginning + data;
+		
+		if ( |f$buffer_beginning| >= f$buffer_beginning_bytes )
+			{
+			event FileAnalysis::trigger(f, BEGINNING_BUFFERED);
+			}
 		}
 	}

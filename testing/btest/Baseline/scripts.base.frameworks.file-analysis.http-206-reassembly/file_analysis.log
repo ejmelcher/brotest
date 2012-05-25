@@ -1,0 +1,8 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	file_analysis
+#fields	fid	protocol	parent_fid	uids	size	mime_type	linear	actions	md5	sha1	sha256	disk_file	mhr_match
+#types	string	string	string	table[string]	count	string	bool	table[enum]	string	string	string	file	bool
+e6314e34ac084c94cf4e0f9cb5479fac	HTTP	-	UWkUyAuUGXf,nQcgTWjvg4c,k6kgXLOoSKl,arKYeMETxOg	161185	image/gif	F	FileAnalysis::ACTION_HASH_SHA256,FileAnalysis::ACTION_HASH_MD5,FileAnalysis::ACTION_EXTRACT,FileAnalysis::ACTION_HASH_SHA1	f6b3de93d404ad7aa17186af07178159	1c7ee5c2a4a315dd558ba54af5346817341b87cb	86303234f388398aab090860b97174866db60454968d3fa4b1d8fedb2733b845	extract-plugin-file-1	-

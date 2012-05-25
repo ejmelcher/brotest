@@ -1,0 +1,11 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	http
+#fields	ts	uid	id.orig_h	id.orig_p	id.resp_h	id.resp_p	trans_depth	method	host	uri	referrer	user_agent	request_body_len	response_body_len	status_code	status_msg	info_code	info_msg	filename	tags	username	password	proxied	mime_type
+#types	time	string	addr	port	addr	port	count	string	string	string	string	string	count	count	count	string	count	string	string	table[enum]	string	string	table[string]	string
+1336399945.904883	UWkUyAuUGXf	192.168.1.78	54507	46.227.66.21	80	1	GET	cdn.anonfiles.com	/1336399651806.gif	-	curl/7.23.1 (x86_64-apple-darwin11.2.0) libcurl/7.23.1 OpenSSL/1.0.1a zlib/1.2.6 libidn/1.22	0	101	206	Partial Content	-	-	-	(empty)	-	-	-	image/gif
+1336399945.906457	arKYeMETxOg	192.168.1.78	54510	46.227.66.21	80	1	GET	cdn.anonfiles.com	/1336399651806.gif	-	curl/7.23.1 (x86_64-apple-darwin11.2.0) libcurl/7.23.1 OpenSSL/1.0.1a zlib/1.2.6 libidn/1.22	0	19902	206	Partial Content	-	-	-	(empty)	-	-	-	image/gif
+1336399945.908625	nQcgTWjvg4c	192.168.1.78	54508	46.227.66.21	80	1	GET	cdn.anonfiles.com	/1336399651806.gif	-	curl/7.23.1 (x86_64-apple-darwin11.2.0) libcurl/7.23.1 OpenSSL/1.0.1a zlib/1.2.6 libidn/1.22	0	61186	206	Partial Content	-	-	-	(empty)	-	-	-	image/gif
+1336399945.906528	k6kgXLOoSKl	192.168.1.78	54509	46.227.66.21	80	1	GET	cdn.anonfiles.com	/1336399651806.gif	-	curl/7.23.1 (x86_64-apple-darwin11.2.0) libcurl/7.23.1 OpenSSL/1.0.1a zlib/1.2.6 libidn/1.22	0	87656	206	Partial Content	-	-	-	(empty)	-	-	-	image/gif

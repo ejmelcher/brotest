@@ -1,0 +1,15 @@
+# @TEST-EXEC: bro -r $TRACES/http-fragmented-file.trace %INPUT
+# @TEST-EXEC: btest-diff file_analysis.log
+# @TEST-EXEC: btest-diff http.log
+# @TEST-EXEC: btest-diff extract-plugin-file-1
+
+@load base/frameworks/file-analysis
+
+redef FileAnalysis::policy += {
+	[$trigger = FileAnalysis::IDENTIFIED_MIME,
+	 $pred(rec: FileAnalysis::Info) = { return rec$mime_type == "image/gif"; },
+	 $action = FileAnalysis::ACTION_EXTRACT ],
+	
+	[$trigger = FileAnalysis::IDENTIFIED_BOF,
+	 $actions = set(FileAnalysis::ACTION_HASH_SHA256, FileAnalysis::ACTION_HASH_MD5, FileAnalysis::ACTION_HASH_SHA1) ],
+};

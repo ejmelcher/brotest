@@ -26,7 +26,7 @@ event FileAnalysis::linear_data(f: Info, data: string) &priority=5
 		}
 	}
 	
-event FileAnalysis::linear_data_done(f: Info)
+event FileAnalysis::linear_data_done(f: Info) &priority=5
 	{
 	if ( f?$disk_file )
 		{

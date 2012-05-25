@@ -92,11 +92,10 @@ event http_entity_data(c: connection, is_orig: bool, length: count, data: string
 		if ( c$http?$file_size )
 			FileAnalysis::send_size(c$http$fid, c$http$file_size);
 		
-		local offset = c$http$data_offset + c$http$bytes;
-		
 		FileAnalysis::send_conn(c$http$fid, c);
-		FileAnalysis::send_data(c$http$fid, "HTTP", offset, data);
-		c$http$bytes += |data|;
+		#print fmt("send data offset:%d len:%d", c$http$data_offset, |data|);
+		FileAnalysis::send_data(c$http$fid, "HTTP", c$http$data_offset, data);
+		c$http$data_offset = c$http$data_offset + |data|;
 		}
 	}
 	
