@@ -339,11 +339,6 @@ u_char* DNS_Interpreter::ExtractName(const u_char*& data, int& len,
 		name[0] = 0;
 		}
 
-	// Convert labels to lower case for consistency.
-	for ( u_char* np = name_start; np < name; ++np )
-		if ( isupper(*np) )
-			*np = tolower(*np);
-
 	return name;
 	}
 

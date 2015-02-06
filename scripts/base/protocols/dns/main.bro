@@ -28,6 +28,10 @@ export {
 		trans_id:      count              &log &optional;
 		## The domain name that is the subject of the DNS query.
 		query:         string             &log &optional;
+		## The domain name taken from the query field in the response.
+		## This field will only have a value if it differs from what is
+		## in the request.
+		resp_query:    string             &log &optional;
 		## The QCLASS value specifying the class of the query.
 		qclass:        count              &log &optional;
 		## A descriptive name for the class of the query.
@@ -302,6 +306,11 @@ hook DNS::do_reply(c: connection, msg: dns_msg, ans: dns_answer, reply: string) 
 		# This is weird: the inquirer must also be providing answers in
 		# the request, which is not what we want to track.
 		return;
+
+	if ( ! c$dns?$query || c$dns$query != ans$query )
+		{
+		c$dns$resp_query = ans$query;
+		}
 
 	if ( ans$answer_type == DNS_ANS )
 		{
