@@ -503,10 +503,12 @@ void File::EndOfFile()
 	if ( ! bof_buffer.full )
 		{
 		bof_buffer.full = true;
+		if ( ! did_mime_type &&
+		     LookupFieldDefaultCount(missing_bytes_idx) == 0 )
+			DetectMIME();
+
 		DeliverStream((const u_char*) "", 0);
 		}
-
-	analyzers.DrainModifications();
 
 	done = true;
 
