@@ -1,5 +1,9 @@
 // See the file "COPYING" in the main distribution directory for copyright.
 
+#define PERSIST_MAX 5000
+
+unsigned int persist_cnt;
+
 #include "config.h"
 
 #include <stdio.h>
@@ -990,8 +994,6 @@ int main(int argc, char** argv)
 
 	snaplen = internal_val("snaplen")->AsCount();
 
-	if ( dns_type != DNS_PRIME )
-		net_init(interfaces, read_files, writefile, do_watchdog);
 
 	BroFile::SetDefaultRotation(log_rotate_interval, log_max_size);
 
@@ -1020,6 +1022,7 @@ int main(int argc, char** argv)
 		delete dns_mgr;
 		exit(0);
 		}
+
 
 	// Just read state file from disk.
 	if ( bst_file )
@@ -1143,6 +1146,8 @@ int main(int argc, char** argv)
 
 	reporter->ReportViaEvents(true);
 
+
+
 	// Drain the event queue here to support the protocols framework configuring DPM
 	mgr.Drain();
 
@@ -1186,6 +1191,10 @@ int main(int argc, char** argv)
 				mem_net_start_total / 1024 / 1024,
 				mem_net_start_malloced / 1024 / 1024);
 			}
+try_again:
+
+	if ( dns_type != DNS_PRIME )
+		net_init(interfaces, read_files, writefile, do_watchdog);
 
 		net_run();
 
@@ -1208,9 +1217,18 @@ int main(int argc, char** argv)
 				(mem_net_done_malloced - mem_net_start_malloced) / 1024 / 1024);
 			}
 
+        if (getenv("AFL_PERSISTENT") && persist_cnt++ < PERSIST_MAX) {
+          FILE *f = fopen("/tmp/fuzz.log", "a");
+          fprintf(f, "Trying again :)\n");
+          fclose(f);
+          raise(SIGSTOP);
+          goto try_again;
+        }
+        FILE *f = fopen("/tmp/fuzz.log", "a");
+        fprintf(f, "Not trying again :(\n");
+        fclose(f);
 		done_with_network();
 		net_delete();
-
 		terminate_bro();
 
 		sqlite3_shutdown();
@@ -1227,6 +1245,7 @@ int main(int argc, char** argv)
 		{
 		persistence_serializer->WriteState(false);
 		terminate_bro();
+
 		}
 
 	delete rule_matcher;
