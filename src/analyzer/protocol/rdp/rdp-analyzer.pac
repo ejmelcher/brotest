@@ -45,7 +45,6 @@ refine flow RDP_Flow += {
 		%{
 		if ( rdp_connect_request )
 			{
-            return true;
 			BifEvent::generate_rdp_connect_request(connection()->bro_analyzer(),
 			                                       connection()->bro_analyzer()->Conn(),
 			                                       bytestring_to_val(${cr.cookie_value}));
@@ -58,7 +57,6 @@ refine flow RDP_Flow += {
 		%{
 		if ( rdp_negotiation_response )
 			{
-            return true;
 			BifEvent::generate_rdp_negotiation_response(connection()->bro_analyzer(),
 			                                            connection()->bro_analyzer()->Conn(),
 			                                            ${nr.selected_protocol});
@@ -71,7 +69,6 @@ refine flow RDP_Flow += {
 		%{
 		if ( rdp_negotiation_failure )
 			{
-            return true;
 			BifEvent::generate_rdp_negotiation_failure(connection()->bro_analyzer(),
 			                                           connection()->bro_analyzer()->Conn(),
 			                                           ${nf.failure_code});
@@ -85,7 +82,6 @@ refine flow RDP_Flow += {
 		%{
 		connection()->bro_analyzer()->ProtocolConfirmation();
 
-		return true;
 		if ( rdp_gcc_server_create_response )
 			BifEvent::generate_rdp_gcc_server_create_response(connection()->bro_analyzer(),
 			                                                  connection()->bro_analyzer()->Conn(),
@@ -134,7 +130,6 @@ refine flow RDP_Flow += {
 			ccd->Assign(18, ec_flags);
 			ccd->Assign(19, utf16_to_utf8_val(${ccore.dig_product_id}));
 
-            return true;
 			BifEvent::generate_rdp_client_core_data(connection()->bro_analyzer(),
 			                                        connection()->bro_analyzer()->Conn(),
 			                                        ccd);
@@ -147,7 +142,6 @@ refine flow RDP_Flow += {
 		%{
 		connection()->bro_analyzer()->ProtocolConfirmation();
 
-		return true;
 		if ( rdp_server_security )
 			BifEvent::generate_rdp_server_security(connection()->bro_analyzer(),
 			                                       connection()->bro_analyzer()->Conn(),
@@ -161,7 +155,6 @@ refine flow RDP_Flow += {
 		%{
 		if ( rdp_server_certificate )
 			{
-		return true;
 			BifEvent::generate_rdp_server_certificate(connection()->bro_analyzer(),
 			                                          connection()->bro_analyzer()->Conn(),
 			                                          ${cert.cert_type},
@@ -173,7 +166,6 @@ refine flow RDP_Flow += {
 
 	function proc_x509_cert_data(x509: X509_Cert_Data): bool
 		%{
-        return true;
 		const bytestring& cert = ${x509.cert};
 
 		ODesc file_handle;

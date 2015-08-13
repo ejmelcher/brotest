@@ -1180,12 +1180,24 @@ int main(int argc, char** argv)
 
     unsigned char some_data[8192];
     size_t size;
+
+    ConnID conn_id;
+    conn_id.src_addr = IPAddr("1.2.3.4");
+    conn_id.dst_addr = IPAddr("5.6.7.8");
+    conn_id.src_port = 3389;
+    conn_id.dst_port = 3389;
 try_again:
     memset(some_data, 0, 8192);
 
     size = read(0, some_data, 100);
-    //Connection* conn = new Connection();
-    analyzer::tcp::TCP_ApplicationAnalyzer * tcpa = new analyzer::tcp::TCP_ApplicationAnalyzer(NULL);
+
+    NetSessions *session = new NetSessions();
+    HashKey *key = new HashKey("hi");
+    //Connection::Connection(NetSessions* s, HashKey* k, double t, const ConnID* id,
+    //                      uint32 flow, const EncapsulationStack* arg_encap)
+    Connection* conn = new Connection(session, key, 1439471031, &conn_id, 1, NULL);
+
+    analyzer::tcp::TCP_ApplicationAnalyzer * tcpa = new analyzer::tcp::TCP_ApplicationAnalyzer(conn);
     binpac::RDP::RDP_Conn *rdp_conn = new binpac::RDP::RDP_Conn(0);
     try {
         rdp_conn->NewData(true, some_data, some_data+size);
