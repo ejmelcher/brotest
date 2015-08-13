@@ -1193,14 +1193,11 @@ try_again:
     }
 
         if (getenv("AFL_PERSISTENT") && persist_cnt++ < PERSIST_MAX) {
-          FILE *f = fopen("/tmp/fuzz.log", "a");
-          fprintf(f, "Trying again :)\n");
-          fclose(f);
           raise(SIGSTOP);
           goto try_again;
         }
         FILE *f = fopen("/tmp/fuzz.log", "a");
-        fprintf(f, "Not trying again :(\n");
+        fprintf(f, "Fuzzed process exiting.. :(\n");
         fclose(f);
         exit(0);
 		terminate_bro();
