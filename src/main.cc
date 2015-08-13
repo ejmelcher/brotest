@@ -1183,11 +1183,6 @@ int main(int argc, char** argv)
 
 
 try_again:
-        {
-        FILE *f = fopen("/tmp/fuzz.log", "a");
-        fprintf(f, "Trying again!\n");
-        fclose(f);
-        }
     ConnID conn_id;
     conn_id.src_addr = IPAddr("1.2.3.4");
     conn_id.dst_addr = IPAddr("5.6.7.8");
