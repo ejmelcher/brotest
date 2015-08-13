@@ -1,4 +1,7 @@
 // See the file "COPYING" in the main distribution directory for copyright.
+#include "./src/analyzer/protocol/rdp/rdp_pac.h"
+#include "analyzer/Analyzer.h"
+#include "analyzer/protocol/tcp/TCP.h"
 
 #define PERSIST_MAX 5000
 
@@ -804,12 +807,6 @@ int main(int argc, char** argv)
 
 	plugin_mgr->SearchDynamicPlugins(bro_plugin_path());
 
-	if ( optind == argc &&
-	     read_files.length() == 0 &&
-	     interfaces.length() == 0 &&
-	     ! (id_name || bst_file) && ! command_line_policy && ! print_plugins )
-		add_input_file("-");
-
 	// Process remaining arguments. X=Y arguments indicate script
 	// variable/parameter assignments. X::Y arguments indicate plugins to
 	// activate/query. The remainder are treated as scripts to load.
@@ -1181,41 +1178,19 @@ int main(int argc, char** argv)
 		unsigned int mem_net_start_total;
 		unsigned int mem_net_start_malloced;
 
-		if ( time_bro )
-			{
-			get_memory_usage(&mem_net_start_total, &mem_net_start_malloced);
-
-			fprintf(stderr, "# initialization %.6f\n", time_net_start - time_start);
-
-			fprintf(stderr, "# initialization %uM/%uM\n",
-				mem_net_start_total / 1024 / 1024,
-				mem_net_start_malloced / 1024 / 1024);
-			}
+    unsigned char some_data[8192];
+    size_t size;
 try_again:
+    memset(some_data, 0, 8192);
 
-	if ( dns_type != DNS_PRIME )
-		net_init(interfaces, read_files, writefile, do_watchdog);
-
-		net_run();
-
-		double time_net_done = current_time(true);;
-
-		unsigned int mem_net_done_total;
-		unsigned int mem_net_done_malloced;
-
-		if ( time_bro )
-			{
-			get_memory_usage(&mem_net_done_total, &mem_net_done_malloced);
-
-			fprintf(stderr, "# total time %.6f, processing %.6f\n",
-				time_net_done - time_start, time_net_done - time_net_start);
-
-			fprintf(stderr, "# total mem %uM/%uM, processing %uM/%uM\n",
-				mem_net_done_total / 1024 / 1024,
-				mem_net_done_malloced / 1024 / 1024,
-				(mem_net_done_total - mem_net_start_total) / 1024 / 1024,
-				(mem_net_done_malloced - mem_net_start_malloced) / 1024 / 1024);
-			}
+    size = read(0, some_data, 100);
+    //Connection* conn = new Connection();
+    analyzer::tcp::TCP_ApplicationAnalyzer * tcpa = new analyzer::tcp::TCP_ApplicationAnalyzer(NULL);
+    binpac::RDP::RDP_Conn *rdp_conn = new binpac::RDP::RDP_Conn(0);
+    try {
+        rdp_conn->NewData(true, some_data, some_data+size);
+    } catch ( binpac::Exception const &e ) {
+    }
 
         if (getenv("AFL_PERSISTENT") && persist_cnt++ < PERSIST_MAX) {
           FILE *f = fopen("/tmp/fuzz.log", "a");
@@ -1227,8 +1202,7 @@ try_again:
         FILE *f = fopen("/tmp/fuzz.log", "a");
         fprintf(f, "Not trying again :(\n");
         fclose(f);
-		done_with_network();
-		net_delete();
+        exit(0);
 		terminate_bro();
 
 		sqlite3_shutdown();
