@@ -494,6 +494,7 @@ Analyzer* Analyzer::FindChild(Tag arg_tag)
 
 Analyzer* Analyzer::FindChild(const char* name)
 	{
+    return 0;
 	Tag tag = analyzer_mgr->GetComponentTag(name);
 	return tag ? FindChild(tag) : 0;
 	}

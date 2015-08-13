@@ -159,7 +159,7 @@ Connection::Connection(NetSessions* s, HashKey* k, double t, const ConnID* id,
 	++current_connections;
 	++total_connections;
 
-	TimerMgr::Tag* tag = current_iosrc->GetCurrentTag();
+	TimerMgr::Tag* tag = NULL;
 	conn_timer_mgr = tag ? new TimerMgr::Tag(*tag) : 0;
 
 	if ( arg_encap )

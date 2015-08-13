@@ -1,7 +1,7 @@
 // See the file "COPYING" in the main distribution directory for copyright.
-#include "./src/analyzer/protocol/rdp/rdp_pac.h"
 #include "analyzer/Analyzer.h"
 #include "analyzer/protocol/tcp/TCP.h"
+#include "analyzer/protocol/rdp/RDP.h"
 
 #define PERSIST_MAX 5000
 
@@ -1181,29 +1181,35 @@ int main(int argc, char** argv)
     unsigned char some_data[8192];
     size_t size;
 
+
+try_again:
+        {
+        FILE *f = fopen("/tmp/fuzz.log", "a");
+        fprintf(f, "Trying again!\n");
+        fclose(f);
+        }
     ConnID conn_id;
     conn_id.src_addr = IPAddr("1.2.3.4");
     conn_id.dst_addr = IPAddr("5.6.7.8");
-    conn_id.src_port = 3389;
-    conn_id.dst_port = 3389;
-try_again:
+    conn_id.src_port = htons(3389);
+    conn_id.dst_port = htons(3389);
+
+    HashKey *key = BuildConnIDHashKey(conn_id);
+    sessions = new NetSessions(); // normally done in net_init
+    Connection* conn = new Connection(sessions, key, 1439471031, &conn_id, 1, NULL);
+    conn->SetTransport(TRANSPORT_TCP);
+    sessions->Insert(conn);
+    analyzer::tcp::TCP_Analyzer *tcpa = new analyzer::tcp::TCP_Analyzer(conn);
+    analyzer::rdp::RDP_Analyzer *rdpa = new analyzer::rdp::RDP_Analyzer(conn);
+    rdpa->SetTCP(tcpa);
+
     memset(some_data, 0, 8192);
+    size = read(0, some_data, 8192);
 
-    size = read(0, some_data, 100);
-
-    NetSessions *session = new NetSessions();
-    HashKey *key = new HashKey("hi");
-    //Connection::Connection(NetSessions* s, HashKey* k, double t, const ConnID* id,
-    //                      uint32 flow, const EncapsulationStack* arg_encap)
-    Connection* conn = new Connection(session, key, 1439471031, &conn_id, 1, NULL);
-
-    analyzer::tcp::TCP_ApplicationAnalyzer * tcpa = new analyzer::tcp::TCP_ApplicationAnalyzer(conn);
-    binpac::RDP::RDP_Conn *rdp_conn = new binpac::RDP::RDP_Conn(0);
     try {
-        rdp_conn->NewData(true, some_data, some_data+size);
+        rdpa->DeliverStream(size, some_data, true);
     } catch ( binpac::Exception const &e ) {
     }
-
         if (getenv("AFL_PERSISTENT") && persist_cnt++ < PERSIST_MAX) {
           raise(SIGSTOP);
           goto try_again;

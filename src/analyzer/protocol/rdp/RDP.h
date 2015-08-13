@@ -1,13 +1,13 @@
 #ifndef ANALYZER_PROTOCOL_RDP_RDP_H
 #define ANALYZER_PROTOCOL_RDP_RDP_H
 
-#include "events.bif.h"
+#include "analyzer/protocol/rdp/events.bif.h"
 
 
 #include "analyzer/protocol/tcp/TCP.h"
 #include "analyzer/protocol/pia/PIA.h"
 
-#include "rdp_pac.h"
+#include "analyzer/protocol/rdp/rdp_pac.h"
 
 namespace analyzer { namespace rdp {
 
