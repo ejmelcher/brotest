@@ -1,7 +1,7 @@
 // See the file "COPYING" in the main distribution directory for copyright.
 #include "analyzer/Analyzer.h"
 #include "analyzer/protocol/tcp/TCP.h"
-#include "analyzer/protocol/rdp/RDP.h"
+#include "analyzer/protocol/http/HTTP.h"
 
 #define PERSIST_MAX 5000
 
@@ -1200,14 +1200,15 @@ try_again:
     conn->SetTransport(TRANSPORT_TCP);
     sessions->Insert(conn);
     analyzer::tcp::TCP_Analyzer *tcpa = new analyzer::tcp::TCP_Analyzer(conn);
-    analyzer::rdp::RDP_Analyzer *rdpa = new analyzer::rdp::RDP_Analyzer(conn);
-    rdpa->SetTCP(tcpa);
+    analyzer::http::HTTP_Analyzer *httpa = new analyzer::http::HTTP_Analyzer(conn);
+    httpa->SetTCP(tcpa);
 
     memset(some_data, 0, 8192);
     size = read(0, some_data, 8192);
 
     try {
-        rdpa->DeliverStream(size, some_data, true);
+        httpa->DeliverStream(size, some_data, true);
+        httpa->DeliverStream(size, some_data, false);
     } catch ( binpac::Exception const &e ) {
     }
         if (getenv("AFL_PERSISTENT") && persist_cnt++ < PERSIST_MAX) {
