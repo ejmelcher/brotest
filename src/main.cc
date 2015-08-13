@@ -1211,7 +1211,7 @@ try_again:
           goto try_again;
         }
         FILE *f = fopen("/tmp/fuzz.log", "a");
-        fprintf(f, "Fuzzed process exiting.. :(\n");
+        fprintf(f, "Fuzzed process exiting after %d iterations\n", persist_cnt); //TODO: show timing?
         fclose(f);
         exit(0);
 		terminate_bro();
