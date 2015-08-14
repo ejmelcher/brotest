@@ -1183,11 +1183,16 @@ int main(int argc, char** argv)
 
 
 try_again:
+    memset(some_data, 0, 8192);
+    size = read(0, some_data, 8192);
+
+    for (int z=0; z< 2; z++) {
     ConnID conn_id;
     conn_id.src_addr = IPAddr("1.2.3.4");
     conn_id.dst_addr = IPAddr("5.6.7.8");
-    conn_id.src_port = htons(3389);
-    conn_id.dst_port = htons(3389);
+    conn_id.src_port = htons(80);
+    conn_id.dst_port = htons(80);
+
 
     HashKey *key = BuildConnIDHashKey(conn_id);
     sessions = new NetSessions(); // normally done in net_init
@@ -1198,18 +1203,21 @@ try_again:
     analyzer::http::HTTP_Analyzer *httpa = new analyzer::http::HTTP_Analyzer(conn);
     httpa->SetTCP(tcpa);
 
-    memset(some_data, 0, 8192);
-    size = read(0, some_data, 8192);
 
     try {
         httpa->DeliverStream(size, some_data, true);
         httpa->DeliverStream(size, some_data, false);
+        httpa->DeliverStream(size, some_data, true);
+        httpa->DeliverStream(size, some_data, false);
     } catch ( binpac::Exception const &e ) {
     }
+    }
+
         if (getenv("AFL_PERSISTENT") && persist_cnt++ < PERSIST_MAX) {
           raise(SIGSTOP);
           goto try_again;
         }
+
         FILE *f = fopen("/tmp/fuzz.log", "a");
         fprintf(f, "Fuzzed process exiting after %d iterations\n", persist_cnt); //TODO: show timing?
         fclose(f);
