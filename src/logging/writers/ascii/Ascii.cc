@@ -66,6 +66,8 @@ void Ascii::InitConfigOptions()
 			(const char*) tsfmt.Bytes(),
 			tsfmt.Len()
 			);
+
+	gzip_level = BifConst::LogAscii::gzip_level;
 	}
 
 bool Ascii::InitFilterOptions()
@@ -87,6 +89,14 @@ bool Ascii::InitFilterOptions()
 				Error("invalid value for 'tsv', must be a string and either \"T\" or \"F\"");
 				return false;
 				}
+			}
+
+		else if ( strcmp(i->first, "gzip_level" ) == 0 )
+			{
+			gzip_level = atoi(i->second);
+			if ( gzip_level < 0 || gzip_level > 9 )
+				Error("invalid value for 'gzip_level', must be a number between 0 and 9.");
+				return false;
 			}
 
 		else if ( strcmp(i->first, "use_json") == 0 )
@@ -192,7 +202,7 @@ bool Ascii::WriteHeaderField(const string& key, const string& val)
 	{
 	string str = meta_prefix + key + separator + val + "\n";
 
-	return safe_write(fd, str.c_str(), str.length());
+	return InternalWrite(fd, str.c_str(), str.length());
 	}
 
 void Ascii::CloseFile(double t)
@@ -203,7 +213,7 @@ void Ascii::CloseFile(double t)
 	if ( include_meta && ! tsv )
 		WriteHeaderField("close", Timestamp(0));
 
-	safe_close(fd);
+	InternalClose(fd);
 	fd = 0;
 	}
 
@@ -219,7 +229,7 @@ bool Ascii::DoInit(const WriterInfo& info, int num_fields, const Field* const * 
 	if ( output_to_stdout )
 		path = "/dev/stdout";
 
-	fname = IsSpecial(path) ? path : path + "." + LogExt();
+	fname = IsSpecial(path) ? path : path + "." + LogExt() + (( gzip_level > 0 ) ? ".gz" : "");
 
 	fd = open(fname.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
 
@@ -229,6 +239,23 @@ bool Ascii::DoInit(const WriterInfo& info, int num_fields, const Field* const * 
 			  Strerror(errno)));
 		fd = 0;
 		return false;
+		}
+
+	if ( gzip_level > 0 )
+		{
+		char mode[4];
+		snprintf(mode, 3, "wb%d", gzip_level);
+		gzfile = gzdopen(fd, mode);
+		if ( gzfile == Z_NULL )
+			{
+			Error(Fmt("cannot gzip %s: %s", fname.c_str(), 
+			                                Strerror(errno)));
+			return false;
+			}
+		}
+	else
+		{
+		gzfile = 0;
 		}
 
 	if ( ! WriteHeader(path) )
@@ -264,7 +291,7 @@ bool Ascii::WriteHeader(const string& path)
 		{
 		// A single TSV-style line is all we need.
 		string str = names + "\n";
-		if ( ! safe_write(fd, str.c_str(), str.length()) )
+		if ( ! InternalWrite(fd, str.c_str(), str.length()) )
 			return false;
 
 		return true;
@@ -275,7 +302,7 @@ bool Ascii::WriteHeader(const string& path)
 		+ get_escaped_string(separator, false)
 		+ "\n";
 
-	if ( ! safe_write(fd, str.c_str(), str.length()) )
+	if ( ! InternalWrite(fd, str.c_str(), str.length()) )
 		return false;
 
 	if ( ! (WriteHeaderField("set_separator", get_escaped_string(set_separator, false)) &&
@@ -337,14 +364,14 @@ bool Ascii::DoWrite(int num_fields, const Field* const * fields,
 		char hex[4] = {'\\', 'x', '0', '0'};
 		bytetohex(bytes[0], hex + 2);
 
-		if ( ! safe_write(fd, hex, 4) )
+		if ( ! InternalWrite(fd, hex, 4) )
 			goto write_error;
 
 		++bytes;
 		--len;
 		}
 
-	if ( ! safe_write(fd, bytes, len) )
+	if ( ! InternalWrite(fd, bytes, len) )
 		goto write_error;
 
         if ( ! IsBuf() )
@@ -368,7 +395,7 @@ bool Ascii::DoRotate(const char* rotated_path, double open, double close, bool t
 
 	CloseFile(close);
 
-	string nname = string(rotated_path) + "." + LogExt();
+	string nname = string(rotated_path) + "." + LogExt() + (gzfile ? ".gz" : "");
 
 	if ( rename(fname.c_str(), nname.c_str()) != 0 )
 		{
@@ -404,6 +431,7 @@ bool Ascii::DoHeartbeat(double network_time, double current_time)
 string Ascii::LogExt()
 	{
 	const char* ext = getenv("BRO_LOG_SUFFIX");
+
 	if ( ! ext )
 		ext = "log";
 
@@ -434,4 +462,54 @@ string Ascii::Timestamp(double t)
 	return tmp;
 	}
 
+bool Ascii::InternalWrite(int fd, const char* data, int len)
+	{
+	if ( gzfile )
+		{
+		while ( len > 0 )
+			{
+			int n = gzwrite(gzfile, data, len);
+			
+			if ( n < 0 )
+				{
+				if ( n == Z_ERRNO )
+					{
+					Error(Fmt("Ascii::InternalWrite error: %s\n", Strerror(errno)));
+					}
+				else
+					{
+					Error(Fmt("Ascii::InternalWrite error: %s\n", gzerror(gzfile, &n)));
+					}
 
+				return false;
+				}
+
+			data += n;
+			len -= n;
+			}
+		}
+	else
+		{
+		return safe_write(fd, data, len);
+		}
+
+	return true;
+	}
+
+bool Ascii::InternalClose(int fd)
+	{
+	if ( gzfile )
+		{
+		if ( gzclose(gzfile) < 0 )
+			{
+			Error(Fmt("Ascii::InternalClose error: %s\n", Strerror(errno)));
+			return false;
+			}
+		}
+	else
+		{
+		safe_close(fd);
+		}
+
+	return true;
+	}
