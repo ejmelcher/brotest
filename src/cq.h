@@ -1,3 +1,6 @@
+
+#include <stdint.h>
+
 struct cq_handle *cq_init(double, double);
 void cq_destroy(struct cq_handle *);
 int cq_enqueue(struct cq_handle *, double, void *);

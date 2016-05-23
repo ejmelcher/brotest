@@ -15,14 +15,14 @@ enum ReassemblerType {
 	REASSEM_FILE,
 
 	// Terminal value. Add new above.
-	REASSEM_TERM,
+	REASSEM_NUM,
 };
 
 class DataBlock {
 public:
 	DataBlock(const u_char* data, uint64 size, uint64 seq,
-			DataBlock* prev, DataBlock* next,
-			ReassemblerType reassem_type = REASSEM_UNKNOWN);
+		  DataBlock* prev, DataBlock* next,
+		  ReassemblerType reassem_type = REASSEM_UNKNOWN);
 
 	~DataBlock();
 
@@ -98,8 +98,9 @@ protected:
 	uint32 total_old_blocks;
 
 	ReassemblerType rtype;
+
 	static uint64 total_size;
-	static std::vector<uint64> sizes;
+	static uint64 sizes[REASSEM_NUM];
 };
 
 inline DataBlock::~DataBlock()

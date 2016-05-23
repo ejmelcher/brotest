@@ -39,6 +39,13 @@ type count_set: set[count];
 ##    directly and then remove this alias.
 type index_vec: vector of count;
 
+## A vector of subnets.
+##
+## .. todo:: We need this type definition only for declaring builtin functions
+##    via ``bifcl``. We should extend ``bifcl`` to understand composite types
+##    directly and then remove this alias.
+type subnet_vec: vector of subnet;
+
 ## A vector of any, used by some builtin functions to store a list of varying
 ## types.
 ##
@@ -118,6 +125,18 @@ type conn_id: record {
 	orig_p: port;	##< The originator's port number.
 	resp_h: addr;	##< The responder's IP address.
 	resp_p: port;	##< The responder's port number.
+} &log;
+
+## The identifying 4-tuple of a uni-directional flow.
+##
+## .. note:: It's actually a 5-tuple: the transport-layer protocol is stored as
+##    part of the port values, `src_p` and `dst_p`, and can be extracted from
+##    them with :bro:id:`get_port_transport_proto`.
+type flow_id : record {
+	src_h: addr;	##< The source IP address.
+	src_p: port;	##< The source port number.
+	dst_h: addr;	##< The destination IP address.
+	dst_p: port;	##< The desintation port number.
 } &log;
 
 ## Specifics about an ICMP conversation. ICMP events typically pass this in
@@ -456,10 +475,10 @@ type NetStats: record {
 };
 
 type ConnStats: record {
-	total_conns: count;           ##< 
-	current_conns: count;         ##< 
-	current_conns_extern: count;  ##< 
-	sess_current_conns: count;    ##< 
+	total_conns: count;           ##<
+	current_conns: count;         ##<
+	current_conns_extern: count;  ##<
+	sess_current_conns: count;    ##<
 
 	num_packets: count;
 	num_fragments: count;
@@ -467,15 +486,15 @@ type ConnStats: record {
 
 	num_tcp_conns: count;         ##< Current number of TCP connections in memory.
 	max_tcp_conns: count;         ##< Maximum number of concurrent TCP connections so far.
-	cumulative_tcp_conns: count;  ##< 
+	cumulative_tcp_conns: count;  ##< Total number of TCP connections so far.
 
 	num_udp_conns: count;         ##< Current number of UDP flows in memory.
-	max_udp_conns: count;         ##< Maximum number of concurrent UDP connections so far.
-	cumulative_udp_conns: count;  ##< 
+	max_udp_conns: count;         ##< Maximum number of concurrent UDP flows so far.
+	cumulative_udp_conns: count;  ##< Total number of UDP flows so far.
 
 	num_icmp_conns: count;        ##< Current number of ICMP flows in memory.
-	max_icmp_conns: count;        ##< Maximum number of concurrent ICMP connections so far.
-	cumulative_icmp_conns: count; ##< 
+	max_icmp_conns: count;        ##< Maximum number of concurrent ICMP flows so far.
+	cumulative_icmp_conns: count; ##< Total number of ICMP flows so far.
 
 	killed_by_inactivity: count;
 };
@@ -516,7 +535,7 @@ type ReassemblerStats: record {
 	unknown_size: count;  ##< Byte size of reassembly tracking for unknown purposes.
 };
 
-## Summary statistics of all regular expression matchers.
+## Statistics of all regular expression matchers.
 ##
 ## .. bro:see:: get_matcher_stats
 type MatcherStats: record {
@@ -529,37 +548,51 @@ type MatcherStats: record {
 	misses: count;      ##< Number of cache misses.
 };
 
+## Statistics of timers.
+##
+## .. bro:see:: get_timer_stats
 type TimerStats: record {
 	current:    count; ##< Current number of pending timers.
 	max:        count; ##< Maximum number of concurrent timers pending so far.
-	cumulative: count;
+	cumulative: count; ##< Cumulative number of timers scheduled.
 };
 
+## Statistics of file analysis.
+##
+## .. bro:see:: get_file_analysis_stats
 type FileAnalysisStats: record {
-	current:    count;
-	max:        count;
-	cumulative: count;
+	current:    count; ##< Current number of files being analyzed.
+	max:        count; ##< Maximum number of concurrent files so far.
+	cumulative: count; ##< Cumulative number of files analyzed.
 };
 
+## Statistics related to Bro's active use of DNS.  These numbers are
+## about Bro performing DNS queries on it's own, not traffic
+## being seen.
+##
+## .. bro:see:: get_dns_stats
 type DNSStats: record {
-	requests:         count;
-	successful:       count;
-	failed:           count;
-	pending:          count;
-	cached_hosts:     count;
-	cached_addresses: count;
+	requests:         count; ##< Number of DNS requests made
+	successful:       count; ##< Number of successful DNS replies.
+	failed:           count; ##< Number of DNS reply failures.
+	pending:          count; ##< Current pending queries.
+	cached_hosts:     count; ##< Number of cached hosts.
+	cached_addresses: count; ##< Number of cached addresses.
 };
 
 ## Statistics about number of gaps in TCP connections.
 ##
 ## .. bro:see:: get_gap_stats
 type GapStats: record {
-	ack_events: count;	##< How many ack events *could* have had gaps.
-	ack_bytes: count;	##< How many bytes those covered.
-	gap_events: count;	##< How many *did* have gaps.
-	gap_bytes: count;	##< How many bytes were missing in the gaps.
+	ack_events: count;  ##< How many ack events *could* have had gaps.
+	ack_bytes: count;   ##< How many bytes those covered.
+	gap_events: count;  ##< How many *did* have gaps.
+	gap_bytes: count;   ##< How many bytes were missing in the gaps.
 };
 
+## Statistics about threads.
+##
+## .. bro:see:: get_thread_stats
 type ThreadStats: record {
 	num_threads: count;
 };
@@ -822,71 +855,6 @@ type entropy_test_result: record {
 	monte_carlo_pi: double;	##< Monte-carlo value for pi.
 	serial_correlation: double;	##< Serial correlation coefficient.
 };
-
-# Prototypes of Bro built-in functions.
-@load base/bif/strings.bif
-@load base/bif/bro.bif
-@load base/bif/reporter.bif
-
-## Deprecated. This is superseded by the new logging framework.
-global log_file_name: function(tag: string): string &redef;
-
-## Deprecated. This is superseded by the new logging framework.
-global open_log_file: function(tag: string): file &redef;
-
-## Specifies a directory for Bro to store its persistent state. All globals can
-## be declared persistent via the :bro:attr:`&persistent` attribute.
-const state_dir = ".state" &redef;
-
-## Length of the delays inserted when storing state incrementally. To avoid
-## dropping packets when serializing larger volumes of persistent state to
-## disk, Bro interleaves the operation with continued packet processing.
-const state_write_delay = 0.01 secs &redef;
-
-global done_with_network = F;
-event net_done(t: time) { done_with_network = T; }
-
-function log_file_name(tag: string): string
-	{
-	local suffix = getenv("BRO_LOG_SUFFIX") == "" ? "log" : getenv("BRO_LOG_SUFFIX");
-	return fmt("%s.%s", tag, suffix);
-	}
-
-function open_log_file(tag: string): file
-	{
-	return open(log_file_name(tag));
-	}
-
-## Internal function.
-function add_interface(iold: string, inew: string): string
-	{
-	if ( iold == "" )
-		return inew;
-	else
-		return fmt("%s %s", iold, inew);
-	}
-
-## Network interfaces to listen on. Use ``redef interfaces += "eth0"`` to
-## extend.
-global interfaces = "" &add_func = add_interface;
-
-## Internal function.
-function add_signature_file(sold: string, snew: string): string
-	{
-	if ( sold == "" )
-		return snew;
-	else
-		return cat(sold, " ", snew);
-	}
-
-## Signature files to read. Use ``redef signature_files  += "foo.sig"`` to
-## extend. Signature files added this way will be searched relative to
-## ``BROPATH``.  Using the ``@load-sigs`` directive instead is preferred
-## since that can search paths relative to the current script.
-global signature_files = "" &add_func = add_signature_file;
-
-## ``p0f`` fingerprint file to use. Will be searched relative to ``BROPATH``.
-const passive_fingerprint_file = "base/misc/p0f.fp" &redef;
 
 # TCP values for :bro:see:`endpoint` *state* field.
 # todo:: these should go into an enum to make them autodoc'able.
@@ -1797,6 +1765,71 @@ type gtp_delete_pdp_ctx_response_elements: record {
 	cause: gtp_cause;
 	ext:   gtp_private_extension &optional;
 };
+
+# Prototypes of Bro built-in functions.
+@load base/bif/strings.bif
+@load base/bif/bro.bif
+@load base/bif/reporter.bif
+
+## Deprecated. This is superseded by the new logging framework.
+global log_file_name: function(tag: string): string &redef;
+
+## Deprecated. This is superseded by the new logging framework.
+global open_log_file: function(tag: string): file &redef;
+
+## Specifies a directory for Bro to store its persistent state. All globals can
+## be declared persistent via the :bro:attr:`&persistent` attribute.
+const state_dir = ".state" &redef;
+
+## Length of the delays inserted when storing state incrementally. To avoid
+## dropping packets when serializing larger volumes of persistent state to
+## disk, Bro interleaves the operation with continued packet processing.
+const state_write_delay = 0.01 secs &redef;
+
+global done_with_network = F;
+event net_done(t: time) { done_with_network = T; }
+
+function log_file_name(tag: string): string
+	{
+	local suffix = getenv("BRO_LOG_SUFFIX") == "" ? "log" : getenv("BRO_LOG_SUFFIX");
+	return fmt("%s.%s", tag, suffix);
+	}
+
+function open_log_file(tag: string): file
+	{
+	return open(log_file_name(tag));
+	}
+
+## Internal function.
+function add_interface(iold: string, inew: string): string
+	{
+	if ( iold == "" )
+		return inew;
+	else
+		return fmt("%s %s", iold, inew);
+	}
+
+## Network interfaces to listen on. Use ``redef interfaces += "eth0"`` to
+## extend.
+global interfaces = "" &add_func = add_interface;
+
+## Internal function.
+function add_signature_file(sold: string, snew: string): string
+	{
+	if ( sold == "" )
+		return snew;
+	else
+		return cat(sold, " ", snew);
+	}
+
+## Signature files to read. Use ``redef signature_files  += "foo.sig"`` to
+## extend. Signature files added this way will be searched relative to
+## ``BROPATH``.  Using the ``@load-sigs`` directive instead is preferred
+## since that can search paths relative to the current script.
+global signature_files = "" &add_func = add_signature_file;
+
+## ``p0f`` fingerprint file to use. Will be searched relative to ``BROPATH``.
+const passive_fingerprint_file = "base/misc/p0f.fp" &redef;
 
 ## Definition of "secondary filters". A secondary filter is a BPF filter given
 ## as index in this table. For each such filter, the corresponding event is

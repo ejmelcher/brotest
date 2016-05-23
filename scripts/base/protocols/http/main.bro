@@ -21,6 +21,7 @@ export {
 	## not.
 	const default_capture_password = F &redef;
 
+	## The record type which contains the fields of the HTTP log.
 	type Info: record {
 		## Timestamp for when the request happened.
 		ts:                      time      &log;
@@ -41,6 +42,8 @@ export {
 		## misspelled like the standard declares, but the name used here
 		## is "referrer" spelled correctly.
 		referrer:                string    &log &optional;
+		## Value of the version portion of the request.
+		version:		string	   &log &optional;
 		## Value of the User-Agent header from the client.
 		user_agent:              string    &log &optional;
 		## Actual uncompressed content size of the data transferred from
@@ -222,6 +225,8 @@ event http_reply(c: connection, version: string, code: count, reason: string) &p
 
 	c$http$status_code = code;
 	c$http$status_msg = reason;
+	c$http$version = version;
+
 	if ( code_in_range(code, 100, 199) )
 		{
 		c$http$info_code = code;
