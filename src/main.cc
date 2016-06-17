@@ -2,6 +2,11 @@
 #include "analyzer/Analyzer.h"
 #include "analyzer/protocol/tcp/TCP.h"
 #include "analyzer/protocol/http/HTTP.h"
+#include "file_analysis/analyzer/x509/X509.h"
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
+#include <openssl/asn1.h>
+#include <openssl/opensslconf.h>
 
 #define PERSIST_MAX 5000
 
@@ -990,7 +995,7 @@ int main(int argc, char** argv)
 			}
 		}
 
-	snaplen = internal_val("snaplen")->AsCount();
+	//snaplen = internal_val("snaplen")->AsCount();
 
 	if ( dns_type != DNS_PRIME )
 		net_init(interfaces, read_files, writefile, do_watchdog);
@@ -1181,15 +1186,22 @@ int main(int argc, char** argv)
 		unsigned int mem_net_start_total;
 		unsigned int mem_net_start_malloced;
 
-    unsigned char some_data[8192];
+    const unsigned char * some_data = (unsigned char*) malloc(8192);
     size_t size;
 
 
-try_again:
-    memset(some_data, 0, 8192);
-    size = read(0, some_data, 8192);
+  while (__AFL_LOOP(1000)) {
+    memset((void*)some_data, 0, 8192);
+    size = read(0, (char*)some_data, 8192);
 
     for (int z=0; z< 2; z++) {
+    auto ssl_cert = d2i_X509(NULL, &some_data, size);
+    if(ssl_cert) {
+        file_analysis::X509Val* cert_val = new file_analysis::X509Val(ssl_cert); // cert_val takes ownership of ssl_cert
+        auto foo = file_analysis::X509::ParseCertificate(cert_val, "id");
+    }
+
+    /*
     ConnID conn_id;
     conn_id.src_addr = IPAddr("1.2.3.4");
     conn_id.dst_addr = IPAddr("5.6.7.8");
@@ -1199,7 +1211,7 @@ try_again:
 
     HashKey *key = BuildConnIDHashKey(conn_id);
     sessions = new NetSessions(); // normally done in net_init
-    Connection* conn = new Connection(sessions, key, 1439471031, &conn_id, 1, NULL);
+    Connection* conn = new Connection(sessions, key, 1439471031, &conn_id, 1, 1, 1, NULL);
     conn->SetTransport(TRANSPORT_TCP);
     sessions->Insert(conn);
     analyzer::tcp::TCP_Analyzer *tcpa = new analyzer::tcp::TCP_Analyzer(conn);
@@ -1214,12 +1226,10 @@ try_again:
         httpa->DeliverStream(size, some_data, false);
     } catch ( binpac::Exception const &e ) {
     }
+    */
     }
 
-        if (getenv("AFL_PERSISTENT") && persist_cnt++ < PERSIST_MAX) {
-          raise(SIGSTOP);
-          goto try_again;
-        }
+    }
 
         FILE *f = fopen("/tmp/fuzz.log", "a");
         fprintf(f, "Fuzzed process exiting after %d iterations\n", persist_cnt); //TODO: show timing?
