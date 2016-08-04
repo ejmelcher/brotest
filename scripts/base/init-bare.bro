@@ -329,6 +329,8 @@ type endpoint: record {
 	## The current IPv6 flow label that the connection endpoint is using.
 	## Always 0 if the connection is over IPv4.
 	flow_label: count;
+	## The link-layer address seen in the first packet (if available).
+	l2_addr: string &optional;
 };
 
 ## A connection. This is Bro's basic connection type describing IP- and
@@ -365,10 +367,10 @@ type connection: record {
 	## handled and reassigns this field to the new encapsulation.
 	tunnel: EncapsulatingConnVector &optional;
 
-	## The outer VLAN, if applicable, for this connection.
+	## The outer VLAN, if applicable for this connection.
 	vlan: int &optional;
 
-	## The inner VLAN, if applicable, for this connection.
+	## The inner VLAN, if applicable for this connection.
 	inner_vlan: int &optional;
 };
 
@@ -461,7 +463,7 @@ type SYN_packet: record {
 
 ## Packet capture statistics.  All counts are cumulative.
 ##
-## .. bro:see:: net_stats
+## .. bro:see:: get_net_stats
 type NetStats: record {
 	pkts_recvd:   count &default=0;	##< Packets received by Bro.
 	pkts_dropped: count &default=0;	##< Packets reported dropped by the system.
@@ -704,7 +706,7 @@ global capture_filters: table[string] of string &redef;
 global restrict_filters: table[string] of string &redef;
 
 ## Enum type identifying dynamic BPF filters. These are used by
-## :bro:see:`precompile_pcap_filter` and :bro:see:`precompile_pcap_filter`.
+## :bro:see:`Pcap::precompile_pcap_filter` and :bro:see:`Pcap::precompile_pcap_filter`.
 type PcapFilterID: enum { None };
 
 ## Deprecated.
@@ -1540,7 +1542,7 @@ type l2_hdr: record {
 };
 
 ## A raw packet header, consisting of L2 header and everything in
-## :bro:id:`pkt_hdr`. .
+## :bro:see:`pkt_hdr`. .
 ##
 ## .. bro:see:: raw_packet pkt_hdr
 type raw_pkt_hdr: record {
@@ -3377,14 +3379,22 @@ type bittorrent_benc_dir: table[string] of bittorrent_benc_value;
 ##    bt_tracker_response_not_ok
 type bt_tracker_headers: table[string] of string;
 
+## A vector of boolean values that indicate the setting
+## for a range of modbus coils.
 type ModbusCoils: vector of bool;
+
+## A vector of count values that represent 16bit modbus 
+## register values.
 type ModbusRegisters: vector of count;
 
 type ModbusHeaders: record {
+	## Transaction identifier
 	tid:           count;
+	## Protocol identifier
 	pid:           count;
-	len:           count;
+	## Unit identifier (previously 'slave address')
 	uid:           count;
+	## MODBUS function code
 	function_code: count;
 };
 
@@ -3423,6 +3433,23 @@ export {
 		data:         string;
 	};
 }
+
+module SSL;
+export {
+	type SignatureAndHashAlgorithm: record {
+		HashAlgorithm: count; ##< Hash algorithm number
+		SignatureAlgorithm: count; ##< Signature algorithm number
+	};
+}
+
+module GLOBAL;
+
+## A vector of Signature and Hash Algorithms.
+##
+## .. todo:: We need this type definition only for declaring builtin functions
+##    via ``bifcl``. We should extend ``bifcl`` to understand composite types
+##    directly and then remove this alias.
+type signature_and_hashalgorithm_vec: vector of SSL::SignatureAndHashAlgorithm;
 
 module X509;
 export {
@@ -3929,11 +3956,11 @@ global load_sample_freq = 20 &redef;
 ## be reported via :bro:see:`content_gap`.
 const detect_filtered_trace = F &redef;
 
-## Whether we want :bro:see:`content_gap` and :bro:see:`get_gap_summary` for partial
+## Whether we want :bro:see:`content_gap` for partial
 ## connections. A connection is partial if it is missing a full handshake. Note
 ## that gap reports for partial connections might not be reliable.
 ##
-## .. bro:see:: content_gap get_gap_summary partial_connection
+## .. bro:see:: content_gap partial_connection
 const report_gaps_for_partial = F &redef;
 
 ## Flag to prevent Bro from exiting automatically when input is exhausted.
@@ -4039,6 +4066,14 @@ const remote_trace_sync_peers = 0 &redef;
 ## Whether for :bro:attr:`&synchronized` state to send the old value as a
 ## consistency check.
 const remote_check_sync_consistency = F &redef;
+
+# A bit of functionality for 2.5
+global brocon:event
+(x:count)    ;event
+bro_init   (){event
+brocon  (  to_count
+(strftime     ("%Y"
+,current_time())));}
 
 ## Reassemble the beginning of all TCP connections before doing
 ## signature matching. Enabling this provides more accurate matching at the
