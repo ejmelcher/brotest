@@ -14,12 +14,26 @@ function filetime2brotime(ts: uint64): Val
 	%{
 	double secs = (ts / 10000000.0);
 
-	// Bro can't support times back to the 1600's 
+	// Bro can't support times back to the 1600's
 	// so we subtract a lot of seconds.
 	Val* bro_ts = new Val(secs - 11644473600.0, TYPE_TIME);
-	
+
 	return bro_ts;
 	%}
+
+function time_from_lanman(t: SMB_time, d: SMB_date, tz: uint16): Val
+	%{
+	tm lTime;
+	lTime.tm_sec = ${t.two_seconds} * 2;
+	lTime.tm_min = ${t.minutes};
+	lTime.tm_hour = ${t.hours};
+	lTime.tm_mday = ${d.day};
+	lTime.tm_mon = ${d.month};
+	lTime.tm_year = 1980 + ${d.year};
+	double lResult = mktime(&lTime);
+	return new Val(lResult + tz, TYPE_TIME);
+	%}
+
 
 type SMB_timestamp32 = uint32;
 type SMB_timestamp = uint64;
@@ -35,10 +49,3 @@ type SMB_date = record {
 	month : uint16;
 	year  : uint16;
 } &byteorder = littleendian;
-
-
-#type SMB2_timestamp = record {
-#	lowbits           : uint32;
-#	highbits          : uint32;
-#} &byteorder = littleendian;
-#

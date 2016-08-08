@@ -15,6 +15,8 @@
 @load frameworks/dpd/detect-protocols.bro
 @load frameworks/dpd/packet-segment-logging.bro
 @load frameworks/intel/do_notice.bro
+@load frameworks/intel/do_expire.bro
+@load frameworks/intel/whitelist.bro
 @load frameworks/intel/seen/__load__.bro
 @load frameworks/intel/seen/conn-established.bro
 @load frameworks/intel/seen/dns.bro
@@ -74,6 +76,11 @@
 @load protocols/modbus/track-memmap.bro
 @load protocols/mysql/software.bro
 @load protocols/rdp/indicate_ssl.bro
+@load protocols/smb/__load__.bro
+@load protocols/smb/files.bro
+@load protocols/smb/main.bro
+@load protocols/smb/smb1-main.bro
+@load protocols/smb/smb2-main.bro
 @load protocols/smtp/blocklists.bro
 @load protocols/smtp/detect-suspicious-orig.bro
 @load protocols/smtp/entities-excerpt.bro

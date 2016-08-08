@@ -1,4 +1,4 @@
-@load ./consts
+@load base/protocols/smb
 
 module SMB;
 
@@ -38,10 +38,8 @@ export {
 	## The file actions which are logged.
 	const logged_file_actions: set[Action] = {
 		FILE_OPEN,
-		FILE_CLOSE, 
-
-		PIPE_OPEN,
-		PIPE_CLOSE,
+		FILE_RENAME,
+		FILE_DELETE,
 
 		PRINT_OPEN,
 		PRINT_CLOSE,
@@ -73,6 +71,9 @@ export {
 		name			: string  &log &optional;
 		## Total size of the file.
 		size			: count   &log &default=0;
+		## If the rename action was seen, this will 
+		## the file's previous name.
+		prev_name		: string  &log &optional;
 		## Last time this file was modified.
 		times			: SMB::MACTimes &log &optional;
 	};
@@ -201,9 +202,9 @@ redef likely_server_ports += { ports };
 
 event bro_init() &priority=5
 	{
-	Log::create_stream(CMD_LOG, [$columns=SMB::CmdInfo]);
-	Log::create_stream(FILES_LOG, [$columns=SMB::FileInfo]);
-	Log::create_stream(MAPPING_LOG, [$columns=SMB::TreeInfo]);
+	Log::create_stream(SMB::CMD_LOG, [$columns=SMB::CmdInfo]);
+	Log::create_stream(SMB::FILES_LOG, [$columns=SMB::FileInfo]);
+	Log::create_stream(SMB::MAPPING_LOG, [$columns=SMB::TreeInfo]);
 
 	Analyzer::register_for_ports(Analyzer::ANALYZER_SMB, ports);
 	}

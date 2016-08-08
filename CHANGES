@@ -1,4 +1,34 @@
 
+2.4-893 | 2016-08-05 15:43:04 -0700
+
+  * Remove -z/--analysis option. (Johanna Amann)
+
+  * Remove already defunct code for XML serialization. (Johanna Amann)
+
+2.4-885 | 2016-08-05 15:03:59 -0700
+
+  * Reverting SMB analyzer merge. (Robin Sommer)
+
+2.4-883 | 2016-08-05 12:57:26 -0400
+
+  * Add a new node type for logging with the cluster framework scripts by 
+    adding a new Bro node type for doing logging (this is intended to 
+    reduce the load on the manager). If a user chooses not to specify a 
+    logger node in the cluster configuration, then the manager will
+    write logs locally as usual. (Daniel Thayer)
+
+2.4-874 | 2016-08-05 12:43:06 -0400
+
+  * SMB analyzer (Seth Hall, Vlad Grigorescu and many others)
+
+2.4-759 | 2016-08-05 09:32:42 -0400
+
+  * Intel framework improvements (Jan Grashoefer)
+    * Added expiration for intelligence items.
+    * Improved intel notices.
+    * Added hook to allow extending the intel log.
+    * Added support for subnets to intel-framework.
+
 2.4-742 | 2016-08-02 15:28:31 -0700
 
   * Fix duplicate SSH authentication failure events. Addresses BIT-1641.

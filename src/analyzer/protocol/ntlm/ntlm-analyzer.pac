@@ -6,10 +6,10 @@ refine connection NTLM_Conn += {
 		%{
 		double secs = (ts / 10000000.0);
 
-		// Bro can't support times back to the 1600's 
+		// Bro can't support times back to the 1600's
 		// so we subtract a lot of seconds.
 		Val* bro_ts = new Val(secs - 11644473600.0, TYPE_TIME);
-		
+
 		return bro_ts;
 		%}
 
@@ -29,7 +29,7 @@ refine connection NTLM_Conn += {
 		RecordVal* result = new RecordVal(BifType::Record::NTLM::AVs);
 		for ( uint i = 0; ${val.pairs[i].id} != 0; i++ )
 			{
-			switch ( ${val.pairs[i].id} ) 
+			switch ( ${val.pairs[i].id} )
 				{
 				case 1:
 					result->Assign(0, utf16_bytestring_to_utf8_val(${val.pairs[i].nb_computer_name.data}));
@@ -106,7 +106,7 @@ refine connection NTLM_Conn += {
 		if ( ${val.flags.negotiate_version} )
 		        result->Assign(3, build_version_record(${val.version}));
 
-		BifEvent::generate_ntlm_negotiate(bro_analyzer(), 
+		BifEvent::generate_ntlm_negotiate(bro_analyzer(),
 		                                  bro_analyzer()->Conn(),
 		                                  result);
 
@@ -127,7 +127,7 @@ refine connection NTLM_Conn += {
 		if ( ${val.flags.negotiate_target_info} )
 			result->Assign(3, build_av_record(${val.target_info}));
 
-		BifEvent::generate_ntlm_challenge(bro_analyzer(), 
+		BifEvent::generate_ntlm_challenge(bro_analyzer(),
 		                                  bro_analyzer()->Conn(),
 		                                  result);
 

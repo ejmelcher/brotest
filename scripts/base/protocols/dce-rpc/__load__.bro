@@ -1,4 +1,4 @@
 @load ./consts
 @load ./main
 
-@load ./endpoint-atsvc
+@load-sigs ./dpd.sig
