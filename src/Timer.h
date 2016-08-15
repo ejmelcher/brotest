@@ -114,7 +114,7 @@ public:
 	double LastTimestamp() const	{ return last_timestamp; }
 	// Returns time of last advance in global network time.
 	double LastAdvance() const	{ return last_advance; }
-	
+
 	static unsigned int* CurrentTimers()	{ return current_timers; }
 
 protected:

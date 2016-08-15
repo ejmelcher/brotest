@@ -176,7 +176,9 @@ cq_enqueue(register struct cq_handle *hp, register double pri,
 	}
 	bp->pri = pri;
 	bp->cookie = cookie;
+
 	++hp->cumulative_num;
+
 	if (++hp->qlen > hp->max_qlen)
 		hp->max_qlen = hp->qlen;
 #ifdef DEBUG
@@ -421,7 +423,6 @@ cq_cumulative_num(struct cq_handle *hp)
 {
 	return hp->cumulative_num;
 }
-
 
 /* Return without doing anything if we fail to allocate a new bucket array */
 static int

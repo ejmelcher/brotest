@@ -63,6 +63,7 @@ int PriorityQueue::Add(PQ_Element* e)
 	BubbleUp(heap_size);
 
 	++cumulative_num;
+
 	if ( ++heap_size > peak_heap_size )
 		peak_heap_size = heap_size;
 

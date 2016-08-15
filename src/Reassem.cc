@@ -11,8 +11,8 @@
 static const bool DEBUG_reassem = false;
 
 DataBlock::DataBlock(const u_char* data, uint64 size, uint64 arg_seq,
-			DataBlock* arg_prev, DataBlock* arg_next,
-			ReassemblerType reassem_type)
+		     DataBlock* arg_prev, DataBlock* arg_next,
+		     ReassemblerType reassem_type)
 	{
 	seq = arg_seq;
 	upper = seq + size;
@@ -28,16 +28,13 @@ DataBlock::DataBlock(const u_char* data, uint64 size, uint64 arg_seq,
 	if ( next )
 		next->prev = this;
 
-	if ( Reassembler::sizes.size() == 0 )
-		Reassembler::sizes.resize(REASSEM_TERM, 0);
-
 	rtype = reassem_type;
 	Reassembler::sizes[rtype] += pad_size(size) + padded_sizeof(DataBlock);
 	Reassembler::total_size += pad_size(size) + padded_sizeof(DataBlock);
 	}
 
 uint64 Reassembler::total_size = 0;
-std::vector<uint64> Reassembler::sizes;
+uint64 Reassembler::sizes[REASSEM_NUM];
 
 Reassembler::Reassembler(uint64 init_seq, ReassemblerType reassem_type)
 	{
@@ -284,7 +281,7 @@ DataBlock* Reassembler::AddAndCheck(DataBlock* b, uint64 seq, uint64 upper,
 	if ( last_block && seq == last_block->upper )
 		{
 		last_block = new DataBlock(data, upper - seq, seq,
-						last_block, 0, rtype);
+					   last_block, 0, rtype);
 		return last_block;
 		}
 
@@ -353,13 +350,7 @@ DataBlock* Reassembler::AddAndCheck(DataBlock* b, uint64 seq, uint64 upper,
 
 uint64 Reassembler::MemoryAllocation(ReassemblerType rtype)
 	{
-	if (Reassembler::sizes.size() == 0 )
-		Reassembler::sizes.resize(REASSEM_TERM, 0);
-
-	if ( rtype < REASSEM_TERM )
-		return Reassembler::sizes[rtype];
-	else
-		return 0;
+	return Reassembler::sizes[rtype];
 	}
 
 bool Reassembler::Serialize(SerialInfo* info) const
