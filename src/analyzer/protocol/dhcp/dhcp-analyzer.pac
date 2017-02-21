@@ -48,13 +48,16 @@ flow DHCP_Flow(is_orig: bool) {
 		return type;
 		%}
 
-	function parse_request(options: DHCP_Option[], type: uint8): bool
+	function parse_message(options: DHCP_Option[], type: uint8): bool
 		%{
 		vector<DHCP_Option*>::const_iterator ptr;
 
 		// Requested IP address to the server.
-		::uint32 req_addr = 0, serv_addr = 0;
+		::uint32 req_addr = 0, serv_addr = 0, subnet_mask = 0, lease = 0;
 		StringVal* host_name = 0;
+
+		// RFC 1533 allows a list of router addresses.
+		TableVal* router_list = 0;
 
 		for ( ptr = options->begin();  ptr != options->end() && ! (*ptr)->last(); ++ptr )
 			{
@@ -72,6 +75,39 @@ flow DHCP_Flow(is_orig: bool) {
 					Unref(host_name);
 					host_name = new StringVal((*ptr)->info()->host_name().length(),
 								  (const char*) (*ptr)->info()->host_name().begin());
+					break;
+
+				case SUBNET_OPTION:
+					subnet_mask = htonl((*ptr)->info()->mask());
+					break;
+
+				case ROUTER_OPTION:
+					// Let's hope there aren't multiple
+					// such options.
+					Unref(router_list);
+					router_list = new TableVal(dhcp_router_list);
+
+						{
+						int num_routers = (*ptr)->info()->router_list()->size();
+
+						for ( int i = 0; i < num_routers; ++i )
+							{
+							vector<uint32>* rlist = (*ptr)->info()->router_list();
+
+							uint32 raddr = (*rlist)[i];
+							::uint32 tmp_addr;
+							tmp_addr = htonl(raddr);
+
+							// index starting from 1
+							Val* index = new Val(i + 1, TYPE_COUNT);
+							router_list->Assign(index, new AddrVal(tmp_addr));
+							Unref(index);
+							}
+						}
+					break;
+
+				case LEASE_OPTION:
+					lease = (*ptr)->info()->lease();
 					break;
 				}
 			}
@@ -112,81 +148,7 @@ flow DHCP_Flow(is_orig: bool) {
 							       dhcp_msg_val_->Ref(), host_name);
 				break;
 
-			default:
-				Unref(host_name);
-				break;
-			}
-
-		return true;
-		%}
-
-	function parse_reply(options: DHCP_Option[], type: uint8): bool
-		%{
-		vector<DHCP_Option*>::const_iterator ptr;
-
-		// RFC 1533 allows a list of router addresses.
-		TableVal* router_list = 0;
-
-		::uint32 subnet_mask = 0, serv_addr = 0;
-
-		uint32 lease = 0;
-		StringVal* host_name = 0;
-
-		for ( ptr = options->begin();
-		      ptr != options->end() && ! (*ptr)->last(); ++ptr )
-			{
-			switch ( (*ptr)->code() )
-				{
-				case SUBNET_OPTION:
-					subnet_mask = htonl((*ptr)->info()->mask());
-					break;
-
-				case ROUTER_OPTION:
-					// Let's hope there aren't multiple
-					// such options.
-					Unref(router_list);
-					router_list = new TableVal(dhcp_router_list);
-
-						{
-						int num_routers = (*ptr)->info()->router_list()->size();
-
-						for ( int i = 0; i < num_routers; ++i )
-							{
-							vector<uint32>* rlist = (*ptr)->info()->router_list();
-
-							uint32 raddr = (*rlist)[i];
-							::uint32 tmp_addr;
-							tmp_addr = htonl(raddr);
-
-							// index starting from 1
-							Val* index = new Val(i + 1, TYPE_COUNT);
-							router_list->Assign(index, new AddrVal(tmp_addr));
-							Unref(index);
-							}
-						}
-					break;
-
-				case LEASE_OPTION:
-					lease = (*ptr)->info()->lease();
-					break;
-
-				case SERV_ID_OPTION:
-					serv_addr = htonl((*ptr)->info()->serv_addr());
-					break;
-
-				case HOST_NAME_OPTION:
-					Unref(host_name);
-					host_name = new StringVal((*ptr)->info()->host_name().length(),
-								  (const char*) (*ptr)->info()->host_name().begin());
-					break;
-				}
-			}
-
-			if ( host_name == 0 )
-				host_name = new StringVal("");
-
-		switch ( type )
-			{
+			// REPLY messages
 			case DHCPOFFER:
 				if ( ! router_list )
 					router_list = new TableVal(dhcp_router_list);
@@ -215,13 +177,13 @@ flow DHCP_Flow(is_orig: bool) {
 				break;
 
 			default:
+				Unref(host_name);
 				Unref(router_list);
 				Unref(host_name);
 				break;
 			}
 
 		return true;
-
 		%}
 
 	function process_dhcp_message(msg: DHCP_Message): bool
@@ -248,37 +210,58 @@ flow DHCP_Flow(is_orig: bool) {
 		r->Assign(5, new AddrVal(${msg.yiaddr}));
 
 		dhcp_msg_val_ = r;
+		
+		parse_message(${msg.options}, ${msg.type});
 
-		switch ( ${msg.op} )
-			{
-			case BOOTREQUEST:	// presumably from client to server
-				if ( ${msg.type} == DHCPDISCOVER ||
-			     	     ${msg.type} == DHCPREQUEST ||
-			     	     ${msg.type} == DHCPDECLINE ||
-			     	     ${msg.type} == DHCPRELEASE ||
-			     	     ${msg.type} == DHCPINFORM )
-					parse_request(${msg.options}, ${msg.type});
-				else
-					connection()->bro_analyzer()->ProtocolViolation(fmt("unknown DHCP message type option for BOOTREQUEST (%d)",
-											    ${msg.type}));
-				break;
-
-			case BOOTREPLY:		// presumably from server to client
-				if ( ${msg.type} == DHCPOFFER ||
-			     	     ${msg.type} == DHCPACK ||
-				     ${msg.type} == DHCPNAK )
-					parse_reply(${msg.options}, ${msg.type});
-				else
-					connection()->bro_analyzer()->ProtocolViolation(fmt("unknown DHCP message type option for BOOTREPLY (%d)",
-											    ${msg.type}));
-
-				break;
-
-			default:
-				connection()->bro_analyzer()->ProtocolViolation(fmt("unknown DHCP message op code (%d). Known codes: 1=BOOTREQUEST, 2=BOOTREPLY",
-										${msg.op}));
-				break;
-			}
+		//switch ( ${msg.op} )
+		//	{
+		//	case BOOTREQUEST:	// presumably from client to server
+		//		if ( ${msg.type} == DHCPDISCOVER        ||
+		//		     ${msg.type} == DHCPREQUEST         ||
+		//		     ${msg.type} == DHCPDECLINE         ||
+		//		     ${msg.type} == DHCPRELEASE         ||
+		//		     ${msg.type} == DHCPINFORM          ||
+		//		     ${msg.type} == DHCPLEASEQUERY      ||
+		//		     ${msg.type} == DHCPBULKLEASEQUERY  ||
+		//		     ${msg.type} == DHCPACTIVELEASEQUERY||
+		//		     ${msg.type} == DHCPTLS
+		//		     )
+		//			{
+		//			parse_message(${msg.options}, ${msg.type});
+		//			}
+		//		else
+		//			{
+		//			//connection()->bro_analyzer()->ProtocolViolation(fmt("unknown DHCP message type option for BOOTREQUEST (%d)",
+		//			//						    ${msg.type}));
+		//			}
+		//		break;
+//
+		//	case BOOTREPLY:		// presumably from server to client
+		//		if ( ${msg.type} == DHCPOFFER ||
+		//		     ${msg.type} == DHCPACK ||
+		//		     ${msg.type} == DHCPNAK ||
+		//		     ${msg.type} == DHCPLEASEUNASSIGNED ||
+		//		     ${msg.type} == DHCPLEASEUNKNOWN    ||
+		//		     ${msg.type} == DHCPLEASEACTIVE     ||
+		//		     ${msg.type} == DHCPLEASEQUERYDONE  ||
+		//		     ${msg.type} == DHCPLEASEQUERYSTATUS||
+		//		     ${msg.type} == DHCPTLS
+		//		    )
+		//			{
+		//			parse_message(${msg.options}, ${msg.type});
+		//			}
+		//		else
+		//			{
+		//			//connection()->bro_analyzer()->ProtocolViolation(fmt("unknown DHCP message type option for BOOTREPLY (%d)",
+		//			//						    ${msg.type}));
+		//			}
+		//		break;
+//
+		//	default:
+		//		//connection()->bro_analyzer()->ProtocolViolation(fmt("unknown DHCP message op code (%d). Known codes: 1=BOOTREQUEST, 2=BOOTREPLY",
+		//		//						${msg.op}));
+		//		break;
+		//	}
 
 		connection()->bro_analyzer()->ProtocolConfirmation();
 		return true;

@@ -53,6 +53,28 @@ event bro_init() &priority=5
 	Analyzer::register_for_ports(Analyzer::ANALYZER_DHCP, ports);
 	}
 
+event dhcp_discover(c: connection, msg: dhcp_msg, req_addr: addr, host_name: string) &priority=5
+	{
+	print msg;
+	print req_addr;
+	print host_name;
+	}
+
+event dhcp_offer(c: connection, msg: dhcp_msg, mask: addr, router: dhcp_router_list, lease: interval, serv_addr: addr, host_name: string)
+	{
+	
+	}
+
+event dhcp_request(c: connection, msg: dhcp_msg, req_addr: addr, serv_addr: addr, host_name: string)
+	{
+	
+	}
+
+event dhcp_decline(c: connection, msg: dhcp_msg, host_name: string)
+	{
+	
+	}
+
 event dhcp_ack(c: connection, msg: dhcp_msg, mask: addr, router: dhcp_router_list, lease: interval, serv_addr: addr, host_name: string) &priority=5
 	{
 	local info: Info;
@@ -76,4 +98,19 @@ event dhcp_ack(c: connection, msg: dhcp_msg, mask: addr, router: dhcp_router_lis
 event dhcp_ack(c: connection, msg: dhcp_msg, mask: addr, router: dhcp_router_list, lease: interval, serv_addr: addr, host_name: string) &priority=-5
 	{
 	Log::write(DHCP::LOG, c$dhcp);
+	}
+
+event dhcp_nak(c: connection, msg: dhcp_msg, host_name: string)
+	{
+	
+	}
+
+event dhcp_release(c: connection, msg: dhcp_msg, host_name: string)
+	{
+	
+	}
+
+event dhcp_inform(c: connection, msg: dhcp_msg, host_name: string)
+	{
+	
 	}

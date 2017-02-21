@@ -10,26 +10,37 @@ enum OP_type {
 # The option types are by no means complete.
 # Anyone can add a new option type in RFC 1533 to be parsed here.
 enum OPTION_type {
-	SUBNET_OPTION	 = 1,
-	ROUTER_OPTION	 = 3,
-	HOST_NAME_OPTION = 12,
-	REQ_IP_OPTION	 = 50,
-	LEASE_OPTION	 = 51,
-	MSG_TYPE_OPTION  = 53,
-	SERV_ID_OPTION	 = 54,	# Server address, actually :)
+	SUBNET_OPTION                      = 1,
+	ROUTER_OPTION                      = 3,
+	HOST_NAME_OPTION                   = 12,
+	REQ_IP_OPTION                      = 50,
+	LEASE_OPTION                       = 51,
+	MSG_TYPE_OPTION                    = 53,
+	SERV_ID_OPTION                     = 54, # Server address, actually :)
+	CLIENT_LAST_TRANSATION_TIME_OPTION = 91, # RFC4388
+	ASSOCIATED_IP_OPTION               = 92, # RFC4388
 	END_OPTION	 = 255,
 };
 
 # Refer to RFC 1533 for message types (with option = 53).
 enum DHCP_message_type {
-	DHCPDISCOVER	= 1,
-	DHCPOFFER	= 2,
-	DHCPREQUEST	= 3,
-	DHCPDECLINE	= 4,
-	DHCPACK		= 5,
-	DHCPNAK		= 6,
-	DHCPRELEASE	= 7,
-	DHCPINFORM	= 8,
+	DHCPDISCOVER         = 1,
+	DHCPOFFER            = 2,
+	DHCPREQUEST          = 3,
+	DHCPDECLINE          = 4,
+	DHCPACK              = 5,
+	DHCPNAK              = 6,
+	DHCPRELEASE          = 7,
+	DHCPINFORM           = 8,
+	DHCPLEASEQUERY       = 10,
+	DHCPLEASEUNASSIGNED  = 11,
+	DHCPLEASEUNKNOWN     = 12,
+	DHCPLEASEACTIVE      = 13,
+	DHCPBULKLEASEQUERY   = 14,
+	DHCPLEASEQUERYDONE   = 15,
+	DHCPACTIVELEASEQUERY = 16,
+	DHCPLEASEQUERYSTATUS = 17,
+	DHCPTLS              = 18,
 };
 
 type Option_Info(code: uint8)  = record {
