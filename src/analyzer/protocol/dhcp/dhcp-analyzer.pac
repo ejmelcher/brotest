@@ -213,56 +213,6 @@ flow DHCP_Flow(is_orig: bool) {
 		
 		parse_message(${msg.options}, ${msg.type});
 
-		//switch ( ${msg.op} )
-		//	{
-		//	case BOOTREQUEST:	// presumably from client to server
-		//		if ( ${msg.type} == DHCPDISCOVER        ||
-		//		     ${msg.type} == DHCPREQUEST         ||
-		//		     ${msg.type} == DHCPDECLINE         ||
-		//		     ${msg.type} == DHCPRELEASE         ||
-		//		     ${msg.type} == DHCPINFORM          ||
-		//		     ${msg.type} == DHCPLEASEQUERY      ||
-		//		     ${msg.type} == DHCPBULKLEASEQUERY  ||
-		//		     ${msg.type} == DHCPACTIVELEASEQUERY||
-		//		     ${msg.type} == DHCPTLS
-		//		     )
-		//			{
-		//			parse_message(${msg.options}, ${msg.type});
-		//			}
-		//		else
-		//			{
-		//			//connection()->bro_analyzer()->ProtocolViolation(fmt("unknown DHCP message type option for BOOTREQUEST (%d)",
-		//			//						    ${msg.type}));
-		//			}
-		//		break;
-//
-		//	case BOOTREPLY:		// presumably from server to client
-		//		if ( ${msg.type} == DHCPOFFER ||
-		//		     ${msg.type} == DHCPACK ||
-		//		     ${msg.type} == DHCPNAK ||
-		//		     ${msg.type} == DHCPLEASEUNASSIGNED ||
-		//		     ${msg.type} == DHCPLEASEUNKNOWN    ||
-		//		     ${msg.type} == DHCPLEASEACTIVE     ||
-		//		     ${msg.type} == DHCPLEASEQUERYDONE  ||
-		//		     ${msg.type} == DHCPLEASEQUERYSTATUS||
-		//		     ${msg.type} == DHCPTLS
-		//		    )
-		//			{
-		//			parse_message(${msg.options}, ${msg.type});
-		//			}
-		//		else
-		//			{
-		//			//connection()->bro_analyzer()->ProtocolViolation(fmt("unknown DHCP message type option for BOOTREPLY (%d)",
-		//			//						    ${msg.type}));
-		//			}
-		//		break;
-//
-		//	default:
-		//		//connection()->bro_analyzer()->ProtocolViolation(fmt("unknown DHCP message op code (%d). Known codes: 1=BOOTREQUEST, 2=BOOTREPLY",
-		//		//						${msg.op}));
-		//		break;
-		//	}
-
 		connection()->bro_analyzer()->ProtocolConfirmation();
 		return true;
 		%}
