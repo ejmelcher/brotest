@@ -40,7 +40,7 @@ export {
 	} &log;
 }
 
-event bro_init()
+event bro_init() &priority=5
 {
 	Log::create_stream(Test::LOG, [$columns=Log]);
 }
@@ -51,9 +51,11 @@ event bro_init()
 
 module Test;
 
-@load frameworks/communication/listen
+@load frameworks/broker/listen
 
-event remote_connection_handshake_done(p: event_peer)
+redef exit_only_after_terminate = T;
+
+event Broker::incoming_connection_established(peer_name: string)
 	{
 	local empty_set: set[string];
 	local empty_vector: vector of string;
@@ -76,7 +78,7 @@ event remote_connection_handshake_done(p: event_peer)
 		$vc=vector(10, 20, 30),
 		$ve=empty_vector
 		]);
-	disconnect(p);
+	terminate();
 	}
 @TEST-END-FILE
 
@@ -84,8 +86,8 @@ event remote_connection_handshake_done(p: event_peer)
 
 #####
 
-redef Communication::nodes += {
-    ["foo"] = [$host = 127.0.0.1, $connect=T, $request_logs=T]
+redef Broker::nodes += {
+    ["foo"] = [$ip = 127.0.0.1, $connect=T, $request_logs=T]
 };
 
 @TEST-END-FILE

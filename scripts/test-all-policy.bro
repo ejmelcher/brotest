@@ -9,6 +9,7 @@
 
 # The base/ scripts are all loaded by default and not included here.
 
+# @load frameworks/broker/listen.bro
 # @load frameworks/communication/listen.bro
 # @load frameworks/control/controllee.bro
 # @load frameworks/control/controller.bro
@@ -53,7 +54,6 @@
 @load misc/profiling.bro
 @load misc/scan.bro
 @load misc/stats.bro
-@load misc/trim-trace-file.bro
 @load protocols/conn/known-hosts.bro
 @load protocols/conn/known-services.bro
 @load protocols/conn/mac-logging.bro

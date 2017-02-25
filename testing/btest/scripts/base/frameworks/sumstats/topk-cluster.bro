@@ -10,9 +10,9 @@
 #
 @TEST-START-FILE cluster-layout.bro
 redef Cluster::nodes = {
-	["manager-1"] = [$node_type=Cluster::MANAGER, $ip=127.0.0.1, $p=37757/tcp, $workers=set("worker-1", "worker-2")],
-	["worker-1"]  = [$node_type=Cluster::WORKER,  $ip=127.0.0.1, $p=37760/tcp, $manager="manager-1", $interface="eth0"],
-	["worker-2"]  = [$node_type=Cluster::WORKER,  $ip=127.0.0.1, $p=37761/tcp, $manager="manager-1", $interface="eth1"],
+	["manager-1"] = [$node_roles=set(Cluster::MANAGER, Cluster::LOGGER), $ip=127.0.0.1, $p=37757/tcp, $workers=set("worker-1", "worker-2")],
+	["worker-1"]  = [$node_roles=set(Cluster::WORKER),  $ip=127.0.0.1, $p=37760/tcp, $manager="manager-1", $interface="eth0"],
+	["worker-2"]  = [$node_roles=set(Cluster::WORKER),  $ip=127.0.0.1, $p=37761/tcp, $manager="manager-1", $interface="eth1"],
 };
 @TEST-END-FILE
 
@@ -45,13 +45,15 @@ event bro_init() &priority=5
 
 	}
 
-event remote_connection_closed(p: event_peer)
+event Broker::outgoing_connection_broken(peer_address: string,
+                                        peer_port: port,
+                                        peer_name: string)
 	{
 	terminate();
 	}
 
 global ready_for_data: event();
-redef Cluster::manager2worker_events += /^ready_for_data$/;
+redef Cluster::manager2worker_events += {"ready_for_data"};
 
 event ready_for_data()
 	{
@@ -93,10 +95,10 @@ event ready_for_data()
 		}
 	}
 
-@if ( Cluster::local_node_type() == Cluster::MANAGER )
+@if ( Cluster::has_local_role(Cluster::MANAGER) )
 
 global peer_count = 0;
-event remote_connection_handshake_done(p: event_peer) &priority=-5
+event Broker::incoming_connection_established(peer_name: string)
 	{
 	++peer_count;
 	if ( peer_count == 2 )

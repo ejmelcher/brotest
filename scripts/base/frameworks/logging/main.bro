@@ -3,6 +3,8 @@
 ##! See :doc:`/frameworks/logging` for an introduction to Bro's
 ##! logging framework.
 
+@load base/frameworks/broker
+
 module Log;
 
 export {
@@ -334,6 +336,11 @@ export {
 	##              Log::remove_default_filter
 	global get_filter: function(id: ID, name: string) : Filter;
 
+	## Sets broker values for remote logging
+	##
+	## log_remote: A bool that determines if logs should be send remote or not
+	global set_remote_logging: function(log_remote: bool);
+
 	## Writes a new log line/entry to a logging stream.
 	##
 	## id: The ID associated with a logging stream to be written to.
@@ -436,6 +443,8 @@ global all_streams: table[ID] of Stream = table();
 global filters: table[ID, string] of Filter;
 
 @load base/bif/logging.bif # Needs Filter and Stream defined.
+@load base/bif/messaging.bif # Needed for broker
+@load base/bif/comm.bif # Needed for broker
 
 module Log;
 
@@ -518,6 +527,12 @@ function create_stream(id: ID, stream: Stream) : bool
 	active_streams[id] = stream;
 	all_streams[id] = stream;
 
+	if (enable_remote_logging)
+		{
+		Broker::enable_remote_logs(id);
+		Broker::publish_topic(fmt("bro/log/%s", id));
+		}
+
 	return add_default_filter(id);
 	}
 
@@ -586,4 +601,10 @@ function add_default_filter(id: ID) : bool
 function remove_default_filter(id: ID) : bool
 	{
 	return remove_filter(id, "default");
+	}
+
+event bro_init() &priority=5
+	{
+	if (enable_local_logging)
+		Broker::subscribe_to_logs("bro/log/");
 	}

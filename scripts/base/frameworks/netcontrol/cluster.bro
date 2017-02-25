@@ -17,9 +17,9 @@ export {
 }
 
 ## Workers need ability to forward commands to manager.
-redef Cluster::worker2manager_events += /NetControl::cluster_netcontrol_(add|remove|delete)_rule/;
+redef Cluster::worker2manager_events += {"NetControl::cluster_netcontrol_add_rule", "NetControl::cluster_netcontrol_remove_rule", "NetControl::cluster_netcontrol_delete_rule"};
 ## Workers need to see the result events from the manager.
-redef Cluster::manager2worker_events += /NetControl::rule_(added|removed|timeout|error|exists|new|destroyed)/;
+redef Cluster::manager2worker_events += {"NetControl::rule_added", "NetControl::rule_removed", "NetControl::rule_timeout", "NetControl::rule_error", "NetControl::rule_exists", "NetControl::rule_new", "NetControl::rule_destroyed"};
 
 function activate(p: PluginState, priority: int)
 	{

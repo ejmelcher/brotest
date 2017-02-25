@@ -21,12 +21,12 @@ redef peer_description = Cluster::node;
 
 # Don't load the listening script until we're a bit more sure that the
 # cluster framework is actually being enabled.
-@load frameworks/communication/listen
+@load policy/frameworks/broker/listen
 
 ## Set the port that this node is supposed to listen on.
-redef Communication::listen_port = Cluster::nodes[Cluster::node]$p;
+redef Broker::listen_port = Cluster::nodes[Cluster::node]$p;
 
-@if ( Cluster::local_node_type() == Cluster::MANAGER )
+@if ( Cluster::has_local_role(Cluster::MANAGER) )
 @load ./nodes/manager
 # If no logger is defined, then the manager receives logs.
 @if ( Cluster::manager_is_logger )
@@ -34,15 +34,15 @@ redef Communication::listen_port = Cluster::nodes[Cluster::node]$p;
 @endif
 @endif
 
-@if ( Cluster::local_node_type() == Cluster::LOGGER )
+@if ( Cluster::has_local_role(Cluster::LOGGER) )
 @load ./nodes/logger
 @endif
 
-@if ( Cluster::local_node_type() == Cluster::PROXY )
-@load ./nodes/proxy
+@if ( Cluster::has_local_role(Cluster::DATANODE) )
+@load ./nodes/datanode
 @endif
 
-@if ( Cluster::local_node_type() == Cluster::WORKER )
+@if ( Cluster::has_local_role(Cluster::WORKER) )
 @load ./nodes/worker
 @endif
 

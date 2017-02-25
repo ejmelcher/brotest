@@ -38,7 +38,8 @@ event OpenFlow::controller_activated(name: string, controller: OpenFlow::Control
 	}
 
 event Broker::outgoing_connection_broken(peer_address: string,
-                                       peer_port: port)
+                                         peer_port: port,
+                                         peer_name: string)
 	{
 	terminate();
 	}

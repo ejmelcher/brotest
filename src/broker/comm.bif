@@ -29,30 +29,6 @@ function Broker::__unpublish_topic%(topic: string%): bool
 	return new Val(broker_mgr->UnpublishTopic(topic->CheckString()), TYPE_BOOL);
 	%}
 
-## Allow advertising interest in the given topic to peers.
-## This has no effect if auto advertise behavior is enabled via the flags
-## supplied to :bro:see:`Broker::enable` or :bro:see:`Broker::set_endpoint_flags`.
-##
-## topic: a topic to allow advertising interest/subscription to peers.
-##
-## Returns: true if successful.
-function Broker::advertise_topic%(topic: string%): bool
-	%{
-	return new Val(broker_mgr->AdvertiseTopic(topic->CheckString()), TYPE_BOOL);
-	%}
-
-## Disallow advertising interest in the given topic to peers.
-## This has no effect if auto advertise behavior is enabled via the flags
-## supplied to :bro:see:`Broker::enable` or :bro:see:`Broker::set_endpoint_flags`.
-##
-## topic: a topic to disallow advertising interest/subscription to peers.
-##
-## Returns: true if successful.
-function Broker::unadvertise_topic%(topic: string%): bool
-	%{
-	return new Val(broker_mgr->UnadvertiseTopic(topic->CheckString()), TYPE_BOOL);
-	%}
-
 ## Generated when a connection has been established due to a previous call
 ## to :bro:see:`Broker::connect`.
 ##
@@ -75,7 +51,8 @@ event Broker::outgoing_connection_established%(peer_address: string,
 ##
 ## .. bro:see:: Broker::outgoing_connection_established
 event Broker::outgoing_connection_broken%(peer_address: string,
-                                        peer_port: port%);
+                                        peer_port: port,
+                                        peer_name: string%);
 
 ## Generated when a connection via :bro:see:`Broker::connect` has failed
 ## because the remote side is incompatible.
@@ -84,7 +61,7 @@ event Broker::outgoing_connection_broken%(peer_address: string,
 ##
 ## peer_port: the port used to connect to the peer.
 event Broker::outgoing_connection_incompatible%(peer_address: string,
-                                              peer_port: port%);
+                                            peer_port: port%);
 
 ## Generated when a peer has established a connection with this process
 ## as a result of previously performing a :bro:see:`Broker::listen`.

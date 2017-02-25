@@ -24,6 +24,7 @@ EnumType* bro_broker::Manager::writer_id_type;
 int bro_broker::Manager::send_flags_self_idx;
 int bro_broker::Manager::send_flags_peers_idx;
 int bro_broker::Manager::send_flags_unsolicited_idx;
+bool using_communication_broker = false;
 
 struct unref_guard {
 	unref_guard(Val* v) : val(v) {}
@@ -66,16 +67,13 @@ static int endpoint_flags_to_int(Val* broker_endpoint_flags)
 	int rval = 0;
 	auto r = broker_endpoint_flags->AsRecordVal();
 	Val* auto_publish_flag = r->Lookup("auto_publish", true);
-	Val* auto_advertise_flag = r->Lookup("auto_advertise", true);
 
 	if ( auto_publish_flag->AsBool() )
 		rval |= broker::AUTO_PUBLISH;
 
-	if ( auto_advertise_flag->AsBool() )
-		rval |= broker::AUTO_ADVERTISE;
+	rval |= broker::AUTO_ADVERTISE;
 
 	Unref(auto_publish_flag);
-	Unref(auto_advertise_flag);
 	return rval;
 	}
 
@@ -83,6 +81,9 @@ bool bro_broker::Manager::Enable(Val* broker_endpoint_flags)
 	{
 	if ( endpoint != nullptr )
 		return true;
+
+	if ( ! reading_traces )
+		using_communication_broker = true;
 
 	auto send_flags_type = internal_type("Broker::SendFlags")->AsRecordType();
 	send_flags_self_idx = require_field(send_flags_type, "self");
@@ -134,6 +135,8 @@ bool bro_broker::Manager::Enable(Val* broker_endpoint_flags)
 
 	int flags = endpoint_flags_to_int(broker_endpoint_flags);
 	endpoint = unique_ptr<broker::endpoint>(new broker::endpoint(name, flags));
+
+	// Register as a "dont-count" source first, we may change that later.
 	iosource_mgr->Register(this, true);
 	return true;
 	}
@@ -150,7 +153,7 @@ bool bro_broker::Manager::SetEndpointFlags(Val* broker_endpoint_flags)
 
 bool bro_broker::Manager::Listen(uint16_t port, const char* addr, bool reuse_addr)
 	{
-	if ( ! Enabled() )
+	if ( ! Enabled() || ! using_communication_broker )
 		return false;
 
 	auto rval = endpoint->listen(port, addr, reuse_addr);
@@ -161,6 +164,9 @@ bool bro_broker::Manager::Listen(uint16_t port, const char* addr, bool reuse_add
 		                addr ? addr : "INADDR_ANY", port,
 		                endpoint->last_error().data());
 		}
+
+	// Register as a "does-count" source now.
+	iosource_mgr->Register(this, false);
 
 	return rval;
 	}
@@ -175,6 +181,9 @@ bool bro_broker::Manager::Connect(string addr, uint16_t port,
 
 	if ( peer )
 		return false;
+
+	// Register as a "does-count" source now.
+	iosource_mgr->Register(this, false);
 
 	peer = endpoint->peer(move(addr), port, retry_interval);
 	return true;
@@ -711,6 +720,7 @@ void bro_broker::Manager::Process()
 				vl->append(new StringVal(u.relation.remote_tuple().first));
 				vl->append(new PortVal(u.relation.remote_tuple().second,
 				                       TRANSPORT_TCP));
+				vl->append(new StringVal(u.peer_name));
 				mgr.QueueEvent(Broker::outgoing_connection_broken, vl);
 				}
 			break;
@@ -722,6 +732,7 @@ void bro_broker::Manager::Process()
 				vl->append(new StringVal(u.relation.remote_tuple().first));
 				vl->append(new PortVal(u.relation.remote_tuple().second,
 				                       TRANSPORT_TCP));
+				vl->append(new StringVal(u.peer_name));
 				mgr.QueueEvent(Broker::outgoing_connection_incompatible, vl);
 				}
 			break;
@@ -797,7 +808,7 @@ void bro_broker::Manager::Process()
 
 			val_list* vl = new val_list;
 			vl->append(new StringVal(move(*msg)));
-			mgr.QueueEvent(Broker::print_handler, vl);
+			mgr.QueueEvent(Broker::print_handler, vl, SOURCE_BROKER);
 			}
 		}
 
@@ -852,14 +863,14 @@ void bro_broker::Manager::Process()
 					vl->append(val);
 				else
 					{
-					reporter->Warning("failed to convert remote event arg # %d",
-					                  i - 1);
+					reporter->Warning("failed to convert remote event %s arg # %d",
+					                  event_name->c_str(), i);
 					break;
 					}
 				}
 
 			if ( static_cast<size_t>(vl->length()) == em.size() - 1 )
-				mgr.QueueEvent(ehp, vl);
+				mgr.QueueEvent(ehp, vl, SOURCE_BROKER);
 			else
 				delete_vals(vl);
 			}

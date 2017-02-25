@@ -1,11 +1,11 @@
-##! Redefines the options common to all proxy nodes within a Bro cluster.
-##! In particular, proxies are not meant to produce logs locally and they
-##! do not forward events anywhere, they mainly synchronize state between
+##! Redefines the options common to the data node within a Bro cluster.
+##! In particular, the datanode is not meant to produce logs locally and it
+##! does not forward events anywhere, it mainly synchronizes state between
 ##! worker nodes.
 
-@prefixes += cluster-proxy
+@prefixes += cluster-datanode
 
-## The proxy only syncs state; does not forward events.
+## The datanode only syncs state; does not forward events.
 redef forward_remote_events = F;
 redef forward_remote_state_changes = T;
 

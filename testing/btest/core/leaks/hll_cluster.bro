@@ -18,9 +18,9 @@
 
 @TEST-START-FILE cluster-layout.bro
 redef Cluster::nodes = {
-	["manager-1"] = [$node_type=Cluster::MANAGER, $ip=127.0.0.1, $p=37757/tcp, $workers=set("worker-1", "worker-2")],
-	["worker-1"]  = [$node_type=Cluster::WORKER,  $ip=127.0.0.1, $p=37760/tcp, $manager="manager-1"],
-	["worker-2"]  = [$node_type=Cluster::WORKER,  $ip=127.0.0.1, $p=37761/tcp, $manager="manager-1"],
+	["manager-1"] = [$node_roles=set(Cluster::MANAGER, Cluster::LOGGER), $ip=127.0.0.1, $p=37757/tcp, $workers=set("worker-1", "worker-2")],
+	["worker-1"]  = [$node_roles=set(Cluster::WORKER),  $ip=127.0.0.1, $p=37760/tcp, $manager="manager-1"],
+	["worker-2"]  = [$node_roles=set(Cluster::WORKER),  $ip=127.0.0.1, $p=37761/tcp, $manager="manager-1"],
 };
 @TEST-END-FILE
 
@@ -28,9 +28,9 @@ redef Log::default_rotation_interval = 0secs;
 
 global hll_data: event(data: opaque of cardinality);
 
-redef Cluster::worker2manager_events += /hll_data/;
+redef Cluster::worker2manager_events += {"hll_data"};
 
-@if ( Cluster::local_node_type() == Cluster::WORKER )
+@if ( Cluster::has_local_role(Cluster::WORKER) )
 
 global runnumber: count &redef; # differentiate runs
 
@@ -85,7 +85,7 @@ event remote_connection_handshake_done(p: event_peer)
 
 @endif
 
-@if ( Cluster::local_node_type() == Cluster::MANAGER )
+@if ( Cluster::has_local_role(Cluster::MANAGER) )
 
 global result_count = 0;
 global hll: opaque of cardinality;

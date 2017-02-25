@@ -82,6 +82,15 @@ struct val_converter {
 		switch ( type->Tag() ) {
 		case TYPE_STRING:
 			return new StringVal(a.size(), a.data());
+		case TYPE_OPAQUE:
+			{
+			SerializationFormat* form = new BinarySerializationFormat();
+			form->StartRead(a.data(), a.size());
+			CloneSerializer ss(form);
+			UnserialInfo uinfo(&ss);
+			uinfo.cache = false;
+			return Val::Unserialize(&uinfo, TYPE_OPAQUE);
+			}
 		case TYPE_FILE:
 			{
 			auto file = BroFile::GetFile(a.data());
@@ -487,7 +496,6 @@ broker::util::optional<broker::data> bro_broker::val_to_data(Val* v)
 				                                          move(*val));
 				}
 			}
-
 		return {rval};
 		}
 	case TYPE_VECTOR:
@@ -539,6 +547,24 @@ broker::util::optional<broker::data> bro_broker::val_to_data(Val* v)
 			rval.fields.emplace_back(broker::record::field{move(*item)});
 			}
 
+		return {rval};
+		}
+	case TYPE_OPAQUE:
+		{
+		SerializationFormat* form = new BinarySerializationFormat();
+		form->StartWrite();
+		CloneSerializer ss(form);
+		SerialInfo sinfo(&ss);
+		sinfo.cache = false;
+		sinfo.include_locations = false;
+
+		if ( ! v->Serialize(&sinfo) )
+			return {};
+
+		char* data;
+		uint32 len = form->EndWrite(&data);
+		string rval(data, len);
+		free(data);
 		return {rval};
 		}
 	default:

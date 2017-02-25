@@ -35,7 +35,8 @@ event NetControl::init_done()
 	}
 
 event Broker::outgoing_connection_broken(peer_address: string,
-                                       peer_port: port)
+                                         peer_port: port,
+                                         peer_name: string)
 	{
 	terminate();
 	}

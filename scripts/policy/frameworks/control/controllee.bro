@@ -10,7 +10,7 @@
 @load base/frameworks/control
 # If an instance is a controllee, it implicitly needs to listen for remote
 # connections.
-@load frameworks/communication/listen
+@load frameworks/broker/listen
 
 module Control;
 
@@ -23,14 +23,14 @@ event Control::id_value_request(id: string)
 event Control::peer_status_request()
 	{
 	local status = "";
-	for ( p in Communication::nodes )
+	for ( p in Broker::nodes )
 		{
-		local peer = Communication::nodes[p];
+		local peer = Broker::nodes[p];
 		if ( ! peer$connected )
 			next;
 
 		status += fmt("%.6f peer=%s host=%s\n",
-			      network_time(), peer$peer$descr, peer$host);
+			      network_time(), peer$peer, peer$ip);
 		}
 
 	event Control::peer_status_response(status);
@@ -43,23 +43,25 @@ event Control::net_stats_request()
 	                  ns$pkts_recvd, ns$pkts_dropped, ns$pkts_link);
 	event Control::net_stats_response(reply);
 	}
-
-event Control::configuration_update_request()
-	{
-	# Generate the alias event.
-	event Control::configuration_update();
-
-	# Don't need to do anything in particular here, it's just indicating that
-	# the configuration is going to be updated.  This event could be handled
-	# by other scripts if they need to do some ancilliary processing if
-	# redef-able consts are modified at runtime.
-	event Control::configuration_update_response();
-	}
-
+	
 event Control::shutdown_request()
 	{
 	# Send the acknowledgement event.
 	event Control::shutdown_response();
 	# Schedule the shutdown to let the current event queue flush itself first.
 	event terminate_event();
+	}
+
+event bro_init() &priority=5
+	{
+	# Subscribe: All nodes need to subscribe to control-related events
+	local prefix = fmt("%srequest/", Control::pub_sub_prefix);
+	Broker::subscribe_to_events(prefix);
+	Broker::publish_topic(prefix);
+
+	# Publish: Register responses to control events with broker
+	prefix = fmt("%sresponse/", Control::pub_sub_prefix);
+	Broker::publish_topic(prefix);
+	for ( e in Control::controllee_events )
+		Broker::auto_event(prefix, lookup_ID(e));
 	}

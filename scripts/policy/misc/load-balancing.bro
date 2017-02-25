@@ -37,12 +37,12 @@ export {
 	};
 }
 
-#redef Cluster::manager2worker_events += /LoadBalancing::send_filter/;
-#redef Cluster::worker2manager_events += /LoadBalancing::confirm_filter_installation/;
+#redef Cluster::manager2worker_events += {"LoadBalancing::send_filter"};
+#redef Cluster::worker2manager_events += {"LoadBalancing::confirm_filter_installation"};
 
 @if ( Cluster::is_enabled() )
 
-@if ( Cluster::local_node_type() == Cluster::MANAGER )
+@if ( Cluster::has_local_role(Cluster::MANAGER) )
 
 event bro_init() &priority=5
 	{
@@ -55,7 +55,7 @@ event bro_init() &priority=5
 		local this_node = Cluster::nodes[n];
 
 		# Only workers!
-		if ( this_node$node_type != Cluster::WORKER ||
+		if ( (Cluster::WORKER !in this_node$node_roles) ||
 		     ! this_node?$interface )
 			next;
 
@@ -70,7 +70,7 @@ event bro_init() &priority=5
 	for ( no in Cluster::nodes )
 		{
 		local that_node = Cluster::nodes[no];
-		if ( that_node$node_type == Cluster::WORKER &&
+		if ( Cluster::WORKER in that_node$node_roles &&
 		     that_node?$interface && [that_node$ip, that_node$interface] in worker_ip_interface )
 			{
 			if ( [that_node$ip, that_node$interface] !in lb_proc_track )
@@ -83,12 +83,20 @@ event bro_init() &priority=5
 			if ( total_lb_procs > 1 )
 				{
 				that_node$lb_filter = PacketFilter::sampling_filter(total_lb_procs, this_lb_proc);
-				Communication::nodes[no]$capture_filter = that_node$lb_filter;
+				Broker::nodes[no]$capture_filter = that_node$lb_filter;
 				}
 			}
 		}
 	}
 
+# TODO replace remote_connection_established by broker events
+event Broker::incoming_connection_established(peer_name: string)
+	{
+	}
+
+event Broker::outgoing_connection_established(peer_address: string, peer_port: port, peer_name: string)
+	{
+	}
 #event remote_connection_established(p: event_peer) &priority=-5
 #	{
 #	if ( is_remote_event() )
@@ -112,7 +120,7 @@ event bro_init() &priority=5
 @endif
 
 
-@if ( Cluster::local_node_type() == Cluster::WORKER )
+@if ( Cluster::has_local_role(Cluster::WORKER) )
 
 #event LoadBalancing::send_filter(for_node: string, filter: string)
 event remote_capture_filter(p: event_peer, filter: string)

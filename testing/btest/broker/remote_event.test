@@ -20,8 +20,10 @@ event bro_init()
 	{
 	Broker::enable();
 	Broker::subscribe_to_events("bro/event/");
+	Broker::publish_topic("bro/event/my_topic");
 	Broker::auto_event("bro/event/my_topic", auto_event_handler);
 	Broker::listen(broker_port, "127.0.0.1");
+	print "is_remote should be F, and is", is_remote_event();
 	}
 
 global event_count = 0;
@@ -31,6 +33,7 @@ event event_handler(msg: string, n: count)
 	{
 	++event_count;
 	print "got event msg", msg, n;
+	print "is_remote should be T, and is", is_remote_event();
 
 	if ( event_count == events_to_recv )
 		{
@@ -57,6 +60,7 @@ event bro_init()
 	{
 	Broker::enable();
 	Broker::subscribe_to_events("bro/event/my_topic");
+	Broker::publish_topic("bro/event/hi");
 	Broker::connect("127.0.0.1", broker_port, 1secs);
 	}
 
@@ -73,7 +77,8 @@ event Broker::outgoing_connection_established(peer_address: string,
 	}
 
 event Broker::outgoing_connection_broken(peer_address: string,
-                                       peer_port: port)
+                                       peer_port: port,
+                                       peer_name: string)
 	{
 	terminate();
 	}
@@ -82,7 +87,7 @@ event event_handler(msg: string, n: count)
 	{
 	print "got event msg", msg, n;
 	local args = Broker::event_args(event_handler, "ping", event_count);
-    Broker::send_event("bro/event/hi", args);
+	Broker::send_event("bro/event/hi", args);
 	++event_count;
 	}
 

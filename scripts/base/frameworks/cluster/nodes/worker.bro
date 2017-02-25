@@ -15,7 +15,7 @@ redef Log::default_rotation_interval = 24hrs;
 ## Use the cluster's delete-log script.
 redef Log::default_rotation_postprocessor_cmd = "delete-log";
 
-@load misc/trim-trace-file
+@load base/misc/trim-trace-file
 ## Record all packets into trace file.
 ##
 ## Note that this only indicates that *if* we are recording packets, we want all

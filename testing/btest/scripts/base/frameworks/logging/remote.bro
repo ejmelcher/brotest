@@ -31,7 +31,7 @@ export {
 	} &log;
 }
 
-event bro_init()
+event bro_init() &priority=5
 {
 	Log::create_stream(Test::LOG, [$columns=Log]);
 	Log::add_filter(Test::LOG, [$name="f1", $path="test.success", $pred=function(rec: Log): bool { return rec$status == "success"; }]);
@@ -41,7 +41,9 @@ event bro_init()
 
 @TEST-START-FILE sender.bro
 
-@load frameworks/communication/listen
+@load frameworks/broker/listen
+
+redef exit_only_after_terminate = T;
 
 module Test;
 
@@ -50,7 +52,7 @@ function fail(rec: Log): bool
 	return rec$status != "success";
 	}
 
-event remote_connection_handshake_done(p: event_peer)
+event Broker::incoming_connection_established(peer_name: string)
 	{
 	Log::add_filter(Test::LOG, [$name="f2", $path="test.failure", $pred=fail]);
 
@@ -64,11 +66,6 @@ event remote_connection_handshake_done(p: event_peer)
 	Log::write(Test::LOG, [$t=network_time(), $id=cid, $status="failure", $country="UK"]);
 	Log::write(Test::LOG, [$t=network_time(), $id=cid, $status="success", $country="BR"]);
 	Log::write(Test::LOG, [$t=network_time(), $id=cid, $status="failure", $country="MX"]);
-	disconnect(p);
-	}
-
-event remote_connection_closed(p: event_peer)
-	{
 	terminate();
 	}
 
@@ -78,13 +75,15 @@ event remote_connection_closed(p: event_peer)
 
 #####
 
-@load base/frameworks/communication
+@load base/frameworks/broker/communication
 
-redef Communication::nodes += {
-    ["foo"] = [$host = 127.0.0.1, $connect=T, $request_logs=T]
+redef Broker::nodes += {
+    ["foo"] = [$ip = 127.0.0.1, $connect=T, $request_logs=T]
 };
 
-event remote_connection_closed(p: event_peer)
+event Broker::outgoing_connection_broken(peer_address: string,
+                                        peer_port: port,
+                                        peer_name: string)
 	{
 	terminate();
 	}

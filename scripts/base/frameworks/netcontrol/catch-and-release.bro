@@ -226,8 +226,8 @@ global blocks: table[addr] of BlockInfo = {}
 
 @if ( Cluster::is_enabled() )
 @load base/frameworks/cluster
-redef Cluster::manager2worker_events += /NetControl::catch_release_block_(new|delete)/;
-redef Cluster::worker2manager_events += /NetControl::catch_release_(add|delete|encountered)/;
+redef Cluster::manager2worker_events += {"NetControl::catch_release_block_new", "NetControl::catch_release_block_delete"};
+redef Cluster::worker2manager_events += {"NetControl::catch_release_add", "NetControl::catch_release_delete", "NetControl::catch_release_encountered"};
 @endif
 
 function cr_check_rule(r: Rule): bool

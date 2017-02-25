@@ -83,7 +83,8 @@ function dv(d: Broker::Data): Broker::DataVector
 global ready: event();
 
 event Broker::outgoing_connection_broken(peer_address: string,
-                                       peer_port: port)
+                                       peer_port: port,
+                                       peer_name: string)
 	{
 	terminate();
 	}
@@ -118,6 +119,7 @@ event Broker::outgoing_connection_established(peer_address: string,
 event bro_init()
 	{
 	Broker::enable();
+	Broker::publish_topic("bro/event/ready");
 	Broker::auto_event("bro/event/ready", ready);
 	Broker::connect("127.0.0.1", broker_port, 1secs);
 	}

@@ -58,6 +58,8 @@ event bro_init()
 
 @TEST-START-FILE receiver.bro
 
+@load base/frameworks/communication
+
 event bro_init()
     {
     capture_events("events.bst");

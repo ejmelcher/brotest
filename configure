@@ -41,8 +41,6 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
     --enable-perftools-debug use Google's perftools for debugging
     --enable-jemalloc      link against jemalloc
     --enable-ruby          build ruby bindings for broccoli (deprecated)
-    --enable-broker        enable use of the Broker communication library
-                           (requires C++ Actor Framework)
     --disable-broccoli     don't build or install the Broccoli library
     --disable-broctl       don't install Broctl
     --disable-auxtools     don't build or install auxiliary tools
@@ -127,7 +125,7 @@ append_cache_entry ENABLE_DEBUG         BOOL   false
 append_cache_entry ENABLE_PERFTOOLS     BOOL   false
 append_cache_entry ENABLE_PERFTOOLS_DEBUG BOOL false
 append_cache_entry ENABLE_JEMALLOC      BOOL   false
-append_cache_entry ENABLE_BROKER        BOOL   false
+append_cache_entry ENABLE_BROKER        BOOL   true
 append_cache_entry BinPAC_SKIP_INSTALL  BOOL   true
 append_cache_entry BUILD_SHARED_LIBS    BOOL   true
 append_cache_entry INSTALL_AUX_TOOLS    BOOL   true
@@ -194,11 +192,6 @@ while [ $# -ne 0 ]; do
             ;;
         --enable-jemalloc)
             append_cache_entry ENABLE_JEMALLOC     BOOL   true
-            ;;
-        --enable-broker)
-            append_cache_entry ENABLE_BROKER        BOOL   true
-            ;;
-        --disable-broker)
             ;;
         --disable-broccoli)
             append_cache_entry INSTALL_BROCCOLI     BOOL   false

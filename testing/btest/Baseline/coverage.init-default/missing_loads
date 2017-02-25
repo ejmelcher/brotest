@@ -1,8 +1,10 @@
+-./frameworks/cluster/nodes/datanode.bro
 -./frameworks/cluster/nodes/logger.bro
 -./frameworks/cluster/nodes/manager.bro
--./frameworks/cluster/nodes/proxy.bro
 -./frameworks/cluster/nodes/worker.bro
 -./frameworks/cluster/setup-connections.bro
+-./frameworks/communication/__load__.bro
+-./frameworks/communication/main.bro
 -./frameworks/intel/cluster.bro
 -./frameworks/netcontrol/cluster.bro
 -./frameworks/notice/cluster.bro

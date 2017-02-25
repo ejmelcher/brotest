@@ -11,9 +11,9 @@
 
 @TEST-START-FILE cluster-layout.bro
 redef Cluster::nodes = {
-	["manager-1"] = [$node_type=Cluster::MANAGER, $ip=127.0.0.1, $p=37757/tcp, $workers=set("worker-1", "worker-2")],
-	["worker-1"]  = [$node_type=Cluster::WORKER,  $ip=127.0.0.1, $p=37760/tcp, $manager="manager-1"],
-	["worker-2"]  = [$node_type=Cluster::WORKER,  $ip=127.0.0.1, $p=37761/tcp, $manager="manager-1"],
+	["manager-1"] = [$node_roles=set(Cluster::MANAGER, Cluster::LOGGER), $ip=127.0.0.1, $p=37757/tcp, $workers=set("worker-1", "worker-2")],
+	["worker-1"]  = [$node_roles=set(Cluster::WORKER),  $ip=127.0.0.1, $p=37760/tcp, $manager="manager-1"],
+	["worker-2"]  = [$node_roles=set(Cluster::WORKER),  $ip=127.0.0.1, $p=37761/tcp, $manager="manager-1"],
 };
 @TEST-END-FILE
 
@@ -23,10 +23,10 @@ module Intel;
 
 redef Log::default_rotation_interval=0sec;
 
-event remote_connection_handshake_done(p: event_peer)
+event Broker::incoming_connection_established(peer_name: string)
 	{
 	# Insert the data once both workers are connected.
-	if ( Cluster::local_node_type() == Cluster::MANAGER && Cluster::worker_count == 2 )
+	if ( Cluster::has_local_role(Cluster::MANAGER) && Cluster::worker_count == 2 )
 		{
 		Intel::insert([$indicator="1.2.3.4", $indicator_type=Intel::ADDR, $meta=[$source="manager"]]);
 		}
@@ -39,7 +39,7 @@ event Intel::cluster_new_item(item: Intel::Item)
 	if ( ! is_remote_event() )
 		return;
 
-	print fmt("cluster_new_item: %s inserted by %s (from peer: %s)", item$indicator, item$meta$source, get_event_peer()$descr);
+	print fmt("cluster_new_item: %s inserted by %s", item$indicator, item$meta$source);
 
 	if ( ! sent_data )
 		{
@@ -72,9 +72,10 @@ event Intel::log_intel(rec: Intel::Info)
 	event Control::shutdown_request();
 	}
 
-event remote_connection_closed(p: event_peer)
+event Broker::outgoing_connection_broken(peer_address: string,
+                                        peer_port: port,
+                                        peer_name: string)
 	{
 	# Cascading termination
-	#print fmt("disconnected from: %s", p);
-	terminate_communication();
+	terminate();
 	}
