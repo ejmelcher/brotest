@@ -145,11 +145,9 @@ bool Ascii::OpenFile()
 		return !fail_on_file_problem;
 		}
 
-	DoUpdate();
-
+	is_failed = false;
 	return true;
 	}
-
 
 bool Ascii::ReadHeader(bool useCached)
 	{
@@ -160,10 +158,7 @@ bool Ascii::ReadHeader(bool useCached)
 	if ( ! useCached )
 		{
 		if ( ! GetLine(line) )
-			{
-			Error("could not read first line");
 			return false;
-			}
 
 		headerline = line;
 		}
@@ -231,7 +226,6 @@ bool Ascii::ReadHeader(bool useCached)
 
 		columnMap.push_back(f);
 		}
-
 
 	// well, that seems to have worked...
 	return true;
@@ -458,4 +452,3 @@ bool Ascii::DoHeartbeat(double network_time, double current_time)
 
 	return true;
 	}
-
