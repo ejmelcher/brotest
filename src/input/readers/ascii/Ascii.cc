@@ -311,17 +311,7 @@ bool Ascii::DoUpdate()
 				file.close();
 				}
 
-			file.open(Info().source);
-			if ( ! file.is_open() )
-				{
-				Error(Fmt("cannot open %s", Info().source));
-				return false;
-				}
-
-			if ( ReadHeader(false) == false )
-				{
-				return false;
-				}
+			OpenFile();
 
 			break;
 			}
