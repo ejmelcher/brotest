@@ -34,6 +34,7 @@
 @load frameworks/files/entropy-test-all-files.bro
 #@load frameworks/files/extract-all-files.bro
 @load frameworks/files/hash-all-files.bro
+@load frameworks/packet-filter/drop-notice.bro
 @load frameworks/packet-filter/shunt.bro
 @load frameworks/software/version-changes.bro
 @load frameworks/software/vulnerable.bro
