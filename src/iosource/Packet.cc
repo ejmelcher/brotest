@@ -236,6 +236,27 @@ void Packet::ProcessLayer2()
 		break;
 		}
 
+	case DLT_LINUX_SLL:
+		{
+		int protocol = (pdata[14] << 8) + pdata[15];
+		pdata += GetLinkHeaderSize(link_type);
+
+		if ( protocol == 0x800 )
+			l3_proto = L3_IPV4;
+		else if ( protocol == 0x86dd )
+			l3_proto = L3_IPV6;
+		else if ( protocol == 0x0806 || protocol == 0x8035 )
+			l3_proto = L3_ARP;
+		else
+			{
+			// Neither IPv4 nor IPv6.
+			Weird("non_ip_packet_in_sll");
+			return;
+			}
+
+		break;
+		}
+
 	case DLT_PPP_SERIAL:
 		{
 		// Get PPP protocol.
