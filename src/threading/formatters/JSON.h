@@ -4,6 +4,7 @@
 #define THREADING_FORMATTERS_JSON_H
 
 #include "../Formatter.h"
+#include "./json.hpp"
 
 namespace threading { namespace formatter {
 
@@ -32,6 +33,7 @@ public:
 private:
 	TimeFormat timestamps;
 	bool surrounding_braces;
+	nlohmann::json *js;
 };
 
 }}
