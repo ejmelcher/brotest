@@ -666,6 +666,9 @@ Val* BinaryExpr::Fold(Val* v1, Val* v2) const
 	if ( v1->Type()->Tag() == TYPE_PATTERN )
 		return PatternFold(v1, v2);
 
+	if ( v1->Type()->IsSet() )
+		return SetFold(v1, v2);
+
 	if ( it == TYPE_INTERNAL_ADDR )
 		return AddrFold(v1, v2);
 
@@ -865,6 +868,32 @@ Val* BinaryExpr::PatternFold(Val* v1, Val* v2) const
 		RE_Matcher_disjunction(re1, re2);
 
 	return new PatternVal(res);
+	}
+
+Val* BinaryExpr::SetFold(Val* v1, Val* v2) const
+	{
+	TableVal* tv1 = v1->AsTableVal();
+	TableVal* tv2 = v2->AsTableVal();
+
+	if ( tag != EXPR_AND && tag != EXPR_OR && tag != EXPR_SUB )
+		BadTag("BinaryExpr::SetFold");
+
+	// TableVal* result = new TableVal(v1->Type()->AsTableType());
+	TableVal* result = v1->Clone()->AsTableVal();
+
+	if ( tag == EXPR_OR )
+		{
+		if ( ! tv2->AddTo(result, false, false) )
+			reporter->InternalError("set union failed to type check");
+		}
+
+	else if ( tag == EXPR_SUB )
+		{
+		if ( ! tv2->RemoveFrom(result) )
+			reporter->InternalError("set difference failed to type check");
+		}
+
+	return result;
 	}
 
 Val* BinaryExpr::AddrFold(Val* v1, Val* v2) const
@@ -1448,24 +1477,39 @@ SubExpr::SubExpr(Expr* arg_op1, Expr* arg_op2)
 	if ( IsError() )
 		return;
 
-	TypeTag bt1 = op1->Type()->Tag();
-	if ( IsVector(bt1) )
-		bt1 = op1->Type()->AsVectorType()->YieldType()->Tag();
+	const BroType* t1 = op1->Type();
+	const BroType* t2 = op2->Type();
 
-	TypeTag bt2 = op2->Type()->Tag();
+	TypeTag bt1 = t1->Tag();
+	if ( IsVector(bt1) )
+		bt1 = t1->AsVectorType()->YieldType()->Tag();
+
+	TypeTag bt2 = t2->Tag();
 	if ( IsVector(bt2) )
-		bt2 = op2->Type()->AsVectorType()->YieldType()->Tag();
+		bt2 = t2->AsVectorType()->YieldType()->Tag();
 
 	BroType* base_result_type = 0;
 
 	if ( bt1 == TYPE_TIME && bt2 == TYPE_INTERVAL )
 		base_result_type = base_type(bt1);
+
 	else if ( bt1 == TYPE_TIME && bt2 == TYPE_TIME )
 		SetType(base_type(TYPE_INTERVAL));
+
 	else if ( bt1 == TYPE_INTERVAL && bt2 == TYPE_INTERVAL )
 		base_result_type = base_type(bt1);
+
+	else if ( t1->IsSet() && t2->IsSet() )
+		{
+		if ( same_type(t1, t2) )
+			SetType(op1->Type()->Ref());
+		else
+			ExprError("incompatible \"set\" operands");
+		}
+
 	else if ( BothArithmetic(bt1, bt2) )
 		PromoteType(max_type(bt1, bt2), is_vector(op1) || is_vector(op2));
+
 	else
 		ExprError("requires arithmetic operands");
 
@@ -1882,13 +1926,16 @@ BitExpr::BitExpr(BroExprTag arg_tag, Expr* arg_op1, Expr* arg_op2)
 	if ( IsError() )
 		return;
 
-	TypeTag bt1 = op1->Type()->Tag();
-	if ( IsVector(bt1) )
-		bt1 = op1->Type()->AsVectorType()->YieldType()->Tag();
+	const BroType* t1 = op1->Type();
+	const BroType* t2 = op2->Type();
 
-	TypeTag bt2 = op2->Type()->Tag();
+	TypeTag bt1 = t1->Tag();
+	if ( IsVector(bt1) )
+		bt1 = t1->AsVectorType()->YieldType()->Tag();
+
+	TypeTag bt2 = t2->Tag();
 	if ( IsVector(bt2) )
-		bt2 = op2->Type()->AsVectorType()->YieldType()->Tag();
+		bt2 = t2->AsVectorType()->YieldType()->Tag();
 
 	if ( (bt1 == TYPE_COUNT || bt1 == TYPE_COUNTER) &&
 	     (bt2 == TYPE_COUNT || bt2 == TYPE_COUNTER) )
@@ -1911,8 +1958,16 @@ BitExpr::BitExpr(BroExprTag arg_tag, Expr* arg_op1, Expr* arg_op2)
 			SetType(base_type(TYPE_PATTERN));
 		}
 
+	else if ( t1->IsSet() && t2->IsSet() )
+		{
+		if ( same_type(t1, t2) )
+			SetType(op1->Type()->Ref());
+		else
+			ExprError("incompatible \"set\" operands");
+		}
+
 	else
-		ExprError("requires \"count\" operands");
+		ExprError("requires \"count\" or compatible \"set\" operands");
 	}
 
 IMPLEMENT_SERIAL(BitExpr, SER_BIT_EXPR);
